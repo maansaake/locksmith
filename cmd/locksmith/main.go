@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	locksmith "github.com/maansthoernvik/locksmith/pkg"
 	"github.com/maansthoernvik/locksmith/pkg/env"
+	locksmith "github.com/maansthoernvik/locksmith/pkg/locksmith"
 	"github.com/maansthoernvik/locksmith/pkg/vault"
 	"github.com/maansthoernvik/locksmith/pkg/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,8 +22,22 @@ func main() {
 	// Set global log level
 	logLevel, _ := env.GetOptionalString(env.LOCKSMITH_LOG_LEVEL, env.LOCKSMITH_LOG_LEVEL_DEFAULT)
 	zerolog.SetGlobalLevel(translateToZerologLevel(logLevel))
-	if console, _ := env.GetOptionalBool(env.LOCKSMITH_LOG_OUTPUT_CONSOLE, env.LOCKSMITH_LOG_OUTPUT_CONSOLE_DEFAULT); console {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	logOutputEnv, err := env.GetOptionalString(env.LOCKSMITH_LOG_OUTPUT, env.LOCKSMITH_LOG_OUTPUT_DEFAULT)
+	checkError(err)
+
+	logOutput := os.Stderr
+	if logOutputEnv == "stdout" {
+		logOutput = os.Stdout
+	}
+
+	console, err := env.GetOptionalBool(env.LOCKSMITH_LOG_OUTPUT_CONSOLE, env.LOCKSMITH_LOG_OUTPUT_CONSOLE_DEFAULT)
+	checkError(err)
+
+	if console {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: logOutput})
+	} else {
+		log.Logger = log.Output(logOutput)
 	}
 
 	// Print to bypass loglevel settings and write to stdout
@@ -42,7 +56,9 @@ func main() {
 
 	// Check if Prometheus metrics are enabled, start the metrics server if so.
 	var metricsServer *http.Server
-	metrics, _ := env.GetOptionalBool(env.LOCKSMITH_METRICS, env.LOCKSMITH_METRICS_DEFAULT)
+	metrics, err := env.GetOptionalBool(env.LOCKSMITH_METRICS, env.LOCKSMITH_METRICS_DEFAULT)
+	checkError(err)
+
 	if metrics {
 		http.Handle("/metrics", promhttp.Handler())
 		metricsServer = &http.Server{Addr: ":20000"}
@@ -69,10 +85,17 @@ func main() {
 		cancel()
 	}()
 
-	port, _ := env.GetOptionalUint16(env.LOCKSMITH_PORT, env.LOCKSMITH_PORT_DEFAULT)
-	queueType, _ := env.GetOptionalString(env.LOCKSMITH_Q_TYPE, env.LOCKSMITH_Q_TYPE_DEFAULT)
-	concurrency, _ := env.GetOptionalInteger(env.LOCKSMITH_Q_CONCURRENCY, env.LOCKSMITH_Q_CONCURRENCY_DEFAULT)
-	capacity, _ := env.GetOptionalInteger(env.LOCKSMITH_Q_CAPACITY, env.LOCKSMITH_Q_CAPACITY_DEFAULT)
+	port, err := env.GetOptionalUint16(env.LOCKSMITH_PORT, env.LOCKSMITH_PORT_DEFAULT)
+	checkError(err)
+
+	queueType, err := env.GetOptionalString(env.LOCKSMITH_Q_TYPE, env.LOCKSMITH_Q_TYPE_DEFAULT)
+	checkError(err)
+
+	concurrency, err := env.GetOptionalInteger(env.LOCKSMITH_Q_CONCURRENCY, env.LOCKSMITH_Q_CONCURRENCY_DEFAULT)
+	checkError(err)
+
+	capacity, err := env.GetOptionalInteger(env.LOCKSMITH_Q_CAPACITY, env.LOCKSMITH_Q_CAPACITY_DEFAULT)
+	checkError(err)
 
 	locksmithOptions := &locksmith.LocksmithOptions{
 		Port:             port,
@@ -80,9 +103,14 @@ func main() {
 		QueueConcurrency: concurrency,
 		QueueCapacity:    capacity,
 	}
-	if tls, _ := env.GetOptionalBool(env.LOCKSMITH_TLS, env.LOCKSMITH_TLS_DEFAULT); tls {
+
+	tls, err := env.GetOptionalBool(env.LOCKSMITH_TLS, env.LOCKSMITH_TLS_DEFAULT)
+	checkError(err)
+
+	if tls {
 		locksmithOptions.TlsConfig = getTlsConfig()
 	}
+
 	if err := locksmith.New(locksmithOptions).Start(ctx); err != nil {
 		log.Error().Err(err).Msg("server start error")
 		os.Exit(1)
@@ -115,26 +143,39 @@ func translateToZerologLevel(level string) zerolog.Level {
 func getTlsConfig() *tls.Config {
 	tlsConfig := &tls.Config{}
 
-	serverCertPath, _ := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)
-	serverKeyPath, _ := env.GetOptionalString(env.LOCKSMITH_TLS_KEY_PATH, env.LOCKSMITH_TLS_KEY_PATH_DEFAULT)
+	serverCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)
+	checkError(err)
+
+	serverKeyPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_KEY_PATH, env.LOCKSMITH_TLS_KEY_PATH_DEFAULT)
+	checkError(err)
+
 	cert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
-	if err != nil {
-		panic("failed to load server cert/key pair")
-	}
+	checkError(err)
+
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	requireClientVerify, _ := env.GetOptionalBool(env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT, env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT)
+	requireClientVerify, err := env.GetOptionalBool(env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT, env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT)
+	checkError(err)
+
 	if requireClientVerify {
-		clientCaCertPath, _ := env.GetOptionalString(env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH, env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT)
+		clientCaCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH, env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT)
+		checkError(err)
+
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		caCert, err := os.ReadFile(clientCaCertPath)
-		if err != nil {
-			panic("failed to read client CA cert file")
-		}
+		checkError(err)
+
 		pool := x509.NewCertPool()
 		pool.AppendCertsFromPEM(caCert)
 		tlsConfig.ClientCAs = pool
 	}
 
 	return tlsConfig
+}
+
+// Panics if the error is not nil.
+func checkError(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

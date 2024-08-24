@@ -58,6 +58,7 @@ Both the binary and the docker container have configuration options that are con
 #### Locksmith server environment variables
 
 - `LOCKSMITH_LOG_LEVEL`: If set, the given value MUST be either `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` (default: `WARNING`)
+- `LOCKSMITH_LOG_OUTPUT`: Set to `stdout` to log to STDOUT instead of STDERR (default: stderr)
 - `LOCKSMITH_LOG_OUTPUT_CONSOLE`: Set to `true` to disable JSON logging (default: false)
 - `LOCKSMITH_PORT`: The port where the locksmith server is reachable (default: `9000`)
 - `LOCKSMITH_TLS`: If set to `true`, TLS is enabled for the locksmith server (default: `false`). When enabled, both `LOCKSMITH_TLS_CERT_PATH` and `LOCKSMITH_TLS_KEY_PATH` must be provided or locksmith will panic
