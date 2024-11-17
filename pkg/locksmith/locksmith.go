@@ -81,9 +81,6 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 	// On connection close, clean up client data
 	defer locksmith.vault.Cleanup(conn.RemoteAddr().String())
 
-	messageBuffer := make([]byte, 0, 257)
-	pos := 0
-
 	buffer := make([]byte, 0, 257)
 	for {
 		n, err := conn.Read(buffer)
@@ -104,33 +101,9 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 		log.Debug().Int("bytes", n).Msg("read from connection")
 		log.Debug().Bytes("buffer", buffer[:n]).Send()
 
-		// We've got content from a previous iteration to handle.
+		// TODO: handle multiple messages in buffer
 
-		// Example:
-		// pos = 9
-		// Index: 0 1 2 3 4 5 6 7 8
-		// Cont:  1 9 a b c d e l k
-		if pos != 0 {
-			//remainingChars := int(messageBuffer[1]) - (pos - 2)
-			// put remaining chars from buffer and handle.
-			//copy()
-			//messageBuffer[pos : pos+remainingChars] = buffer[:remainingChars]
-		}
-
-		/*
-
-			Check read buffer:
-
-			* If the buffer length matches [1] + 2, it's just one fully formed message.
-			* If the messageBuffer has contents, the what's been read must complement what's been stored from the previous TCP packet.
-			* If the buffer length does not match [1] + 2, it's two or more message's contents, and the first can be handled while content for
-			  the second must be buffered UNLESS it ends in the context of the same buffer (multiple messages fit in the read 257 bytes
-			  worth of space)
-			* pos must be set to the end of the messageBuffer
-
-		*/
-
-		incomingMessage, err := protocol.DecodeServerMessage(messageBuffer[:n])
+		incomingMessage, err := protocol.DecodeServerMessage(buffer[:n])
 		if err != nil {
 			log.Error().
 				Err(err).
