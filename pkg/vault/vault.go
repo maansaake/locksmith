@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/maansthoernvik/locksmith/pkg/vault/queue"
+	"github.com/maansaake/locksmith/pkg/vault/queue"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
@@ -177,6 +177,7 @@ func (vault *vaultImpl) acquireAction(
 		lock := vault.fetch(lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
+		//nolint:gocritic
 		if lock.isOwner(client) {
 			lock.unlock()
 			locksGauge.Dec()
@@ -223,7 +224,7 @@ func (vault *vaultImpl) Release(
 }
 
 // Returns a callback that handles the release of locks. This is the only piece
-// of code allowed to touch release-handling, similarily to the acquireAction
+// of code allowed to touch release-handling, similarly to the acquireAction
 // function. The returned function must only be called from the scope of a
 // synchronization Go-routine.
 func (vault *vaultImpl) releaseAction(
@@ -233,6 +234,7 @@ func (vault *vaultImpl) releaseAction(
 	return func(lockTag string) {
 		currentState := vault.fetch(lockTag)
 		// if already unlocked, kill the client for not following the protocol
+		//nolint:gocritic
 		if !currentState.isLocked() {
 			rejectionCounter.With(prometheus.Labels{"reason": "unnecessary_release"}).Inc()
 

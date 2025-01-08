@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maansthoernvik/locksmith/pkg/client"
+	"github.com/maansaake/locksmith/pkg/client"
 )
 
 func TestTcpAcceptor_AcceptConnections(t *testing.T) {

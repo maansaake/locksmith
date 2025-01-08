@@ -158,6 +158,7 @@ func decodeServerMessageType(bytes []byte) (ServerMessageType, error) {
 
 // decodeserverMessageType attempts to extract the ClientMessageType from the given byte slice.
 func decodeClientMessageType(bytes []byte) (ClientMessageType, error) {
+	//nolint:gocritic
 	switch ClientMessageType(bytes[0]) {
 	case Acquired:
 		return Acquired, nil

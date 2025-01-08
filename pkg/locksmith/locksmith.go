@@ -7,9 +7,9 @@ import (
 	"io"
 	"net"
 
-	"github.com/maansthoernvik/locksmith/pkg/connection"
-	"github.com/maansthoernvik/locksmith/pkg/protocol"
-	"github.com/maansthoernvik/locksmith/pkg/vault"
+	"github.com/maansaake/locksmith/pkg/connection"
+	"github.com/maansaake/locksmith/pkg/protocol"
+	"github.com/maansaake/locksmith/pkg/vault"
 	"github.com/rs/zerolog/log"
 )
 

@@ -72,6 +72,7 @@ func (multiQueue *multiQueue) Enqueue(lockTag string, action func(string)) {
 // Enqueue(...) call.
 func (multiQueue *multiQueue) queueIndexFromHash(hash uint16) uint16 {
 	if hash == math.MaxUint16 {
+		//nolint:gosec
 		return uint16(len(multiQueue.queues)) - 1
 	}
 

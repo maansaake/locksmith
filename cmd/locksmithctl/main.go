@@ -13,12 +13,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/maansthoernvik/locksmith/pkg/client"
+	"github.com/maansaake/locksmith/pkg/client"
 	"github.com/rs/zerolog"
 )
 
 const USAGE = `Starts a session towards a Locksmith instance using the sample Locksmith
 client implementation.`
+
 const COMMANDS = `Session started, the following commands are supported:
 
 acquire [lock]
@@ -156,7 +157,8 @@ func initClient() error {
 	}
 
 	c = client.NewClient(&client.ClientOptions{
-		Host:      host,
+		Host: host,
+		//nolint:gosec
 		Port:      uint16(port),
 		TlsConfig: tlsConfig,
 		OnAcquired: func(lock string) {

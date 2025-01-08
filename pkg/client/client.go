@@ -7,7 +7,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/maansthoernvik/locksmith/pkg/protocol"
+	"github.com/maansaake/locksmith/pkg/protocol"
 	"github.com/rs/zerolog/log"
 )
 

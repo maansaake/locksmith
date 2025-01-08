@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maansthoernvik/locksmith/pkg/vault/queue"
+	"github.com/maansaake/locksmith/pkg/vault/queue"
 )
 
 // This test is meant to run manually to compare queue implementations.

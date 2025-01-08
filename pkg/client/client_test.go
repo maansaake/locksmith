@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maansthoernvik/locksmith/pkg/protocol"
+	"github.com/maansaake/locksmith/pkg/protocol"
 )
 
 func Test_ClientLifecycle(t *testing.T) {

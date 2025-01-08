@@ -8,11 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/maansthoernvik/locksmith/pkg/env"
-	locksmith "github.com/maansthoernvik/locksmith/pkg/locksmith"
-	"github.com/maansthoernvik/locksmith/pkg/vault"
-	"github.com/maansthoernvik/locksmith/pkg/version"
+	"github.com/maansaake/locksmith/pkg/env"
+	locksmith "github.com/maansaake/locksmith/pkg/locksmith"
+	"github.com/maansaake/locksmith/pkg/vault"
+	"github.com/maansaake/locksmith/pkg/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -61,7 +62,7 @@ func main() {
 
 	if metrics {
 		http.Handle("/metrics", promhttp.Handler())
-		metricsServer = &http.Server{Addr: ":20000"}
+		metricsServer = &http.Server{Addr: ":20000", ReadHeaderTimeout: 1 * time.Second}
 		go func() {
 			log.Info().Str("address", metricsServer.Addr).Msg("starting metrics server")
 			if err := metricsServer.ListenAndServe(); err != http.ErrServerClosed {
@@ -141,7 +142,7 @@ func translateToZerologLevel(level string) zerolog.Level {
 
 // Fetch TLS config to supply the TCP listener.
 func getTlsConfig() *tls.Config {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
 
 	serverCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)
 	checkError(err)

@@ -1,3 +1,22 @@
-  run:
-    build-tags:
-      - codeanalysis
+run:
+  timeout: 2m
+  tests: false
+
+linters:
+  disable-all: true
+  enable:
+  # default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  # non-default additions
+    - bodyclose
+    - errname
+    - gocritic
+    - gofumpt
+    - goimports
+    - misspell
+    - gosec

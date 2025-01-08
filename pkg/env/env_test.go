@@ -8,17 +8,17 @@ import (
 func Test_RequiredAndOptionalVariables(t *testing.T) {
 	t.Log("Getting mandatory variables that are missing")
 	_, err := GetRequiredBool("DOES_NOT_EXIST_B")
-	if _, ok := err.(*ErrorNotFound); !ok {
+	if _, ok := err.(*NotFoundError); !ok {
 		t.Fatal("Expected a not found error for the required boolean variable")
 	}
 
 	_, err = GetRequiredString("DOES_NOT_EXIST_S")
-	if _, ok := err.(*ErrorNotFound); !ok {
+	if _, ok := err.(*NotFoundError); !ok {
 		t.Fatal("Expected a not found error for the required string variable")
 	}
 
 	_, err = GetRequiredInteger("DOES_NOT_EXIST_I")
-	if _, ok := err.(*ErrorNotFound); !ok {
+	if _, ok := err.(*NotFoundError); !ok {
 		t.Fatal("Expected a not found error for the required integer variable")
 	}
 
