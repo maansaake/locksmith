@@ -49,9 +49,9 @@ type Vault interface {
 	// and the callback a function which will be called to either confirm acquisition or
 	// including an error in case the client is misbehaving. The callback may return an
 	// error in case feedback handling encounters an error.
-	Acquire(lockTag string, client string, callback func(error) error)
-	Release(lockTag string, client string, callback func(error) error)
-	Cleanup(client string)
+	Acquire(lockTag, client string, callback func(error) error)
+	Release(lockTag, client string, callback func(error) error)
+	Cleanup(locktag, client string)
 }
 
 type lockState bool
@@ -102,10 +102,6 @@ type vaultImpl struct {
 
 	// Waitlisted clients per lock.
 	waitList map[string][]*func(lockTag string)
-
-	// Used to keep track of which locks a client owns without having to iterate over
-	// all of them. Used when clients disconnect to release locks held by them.
-	clientLookUpTable map[string][]string
 }
 
 type QueueType string
@@ -132,9 +128,8 @@ type VaultOptions struct {
 
 func NewVault(options *VaultOptions) Vault {
 	vault := &vaultImpl{
-		state:             make(map[string]*lock),
-		waitList:          make(map[string][]*func(string)),
-		clientLookUpTable: make(map[string][]string),
+		state:    make(map[string]*lock),
+		waitList: make(map[string][]*func(string)),
 	}
 	if options.QueueType == Single {
 		vault.queueLayer = queue.NewSingleQueue(options.QueueCapacity)
@@ -202,8 +197,6 @@ func (vault *vaultImpl) acquireAction(
 				lock.lock(client)
 				locksGauge.Inc()
 				acquireCounter.Inc()
-
-				vault.appendClientLookupTable(client, lockTag)
 			}
 		}
 	}
@@ -254,24 +247,17 @@ func (vault *vaultImpl) releaseAction(
 
 			_ = callback(nil) // We don't care about release errors
 
-			vault.cleanClientLookupTable(client, lockTag)
-
 			vault.popWaitlist(lockTag)
 		}
 	}
 }
 
-// Cleans up all information associated with a given client.
-func (vault *vaultImpl) Cleanup(client string) {
-	log.Info().Str("client", client).Msg("cleaning up after client")
-	lockTags := vault.clientLookUpTable[client]
-
-	for _, lockTag := range lockTags {
-		vault.queueLayer.Enqueue(
-			lockTag, vault.cleanupAction(client),
-		)
-	}
-	delete(vault.clientLookUpTable, client)
+// Cleans up a locktag associated with a given client.
+func (vault *vaultImpl) Cleanup(lockTag, client string) {
+	log.Info().Str("client", client).Msg("cleaning up")
+	vault.queueLayer.Enqueue(
+		lockTag, vault.cleanupAction(client),
+	)
 }
 
 // Returns a callback that handles the cleanup of a client for a given lock tag.
@@ -280,6 +266,7 @@ func (vault *vaultImpl) Cleanup(client string) {
 // handles the vault's lock states.
 func (vault *vaultImpl) cleanupAction(client string) func(string) {
 	return func(lockTag string) {
+		log.Debug().Str("tag", lockTag).Msg("cleanup")
 		if currentState := vault.fetch(lockTag); currentState.isOwner(client) {
 			currentState.unlock()
 			locksGauge.Dec()
@@ -333,31 +320,5 @@ func (vault *vaultImpl) popWaitlist(lockTag string) {
 		f(lockTag)
 	} else {
 		log.Debug().Msg("no waitlisted clients found")
-	}
-}
-
-// Add a lock to a client's lookup table.
-func (vault *vaultImpl) appendClientLookupTable(client, lockTag string) {
-	if _, ok := vault.clientLookUpTable[client]; !ok {
-		vault.clientLookUpTable[client] = []string{lockTag}
-	} else {
-		vault.clientLookUpTable[client] = append(vault.clientLookUpTable[client], lockTag)
-	}
-}
-
-// Remove a lock from a client's lookup table.
-func (vault *vaultImpl) cleanClientLookupTable(client, lockTag string) {
-	if lts, ok := vault.clientLookUpTable[client]; ok {
-		if len(lts) == 1 {
-			delete(vault.clientLookUpTable, client)
-		} else {
-			newLts := make([]string, 0, len(lts)-1)
-			for _, lt := range lts {
-				if lt != lockTag {
-					newLts = append(newLts, lt)
-				}
-			}
-			vault.clientLookUpTable[client] = newLts
-		}
 	}
 }

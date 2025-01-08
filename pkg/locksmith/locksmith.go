@@ -81,7 +81,7 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 	// On connection close, clean up client data
 	defer locksmith.vault.Cleanup(conn.RemoteAddr().String())
 
-	buffer := make([]byte, 0, 257)
+	buffer := make([]byte, 257)
 	for {
 		n, err := conn.Read(buffer)
 		if err != nil {
