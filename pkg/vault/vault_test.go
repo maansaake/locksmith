@@ -14,9 +14,8 @@ func (t *tql) Enqueue(locktag string, action func(string)) {
 
 func Test_Acquire(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -41,9 +40,8 @@ func Test_Acquire(t *testing.T) {
 
 func Test_Release(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -73,10 +71,9 @@ func Test_Release(t *testing.T) {
 
 func Test_Waitlist(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		waitList:          make(map[string][]*func(string)),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		waitList:   make(map[string][]*func(string)),
+		queueLayer: &tql{},
 	}
 
 	order := make([]string, 0, 3)
@@ -122,9 +119,8 @@ func Test_Waitlist(t *testing.T) {
 
 func Test_ReleaseBadManners(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -148,9 +144,8 @@ func Test_ReleaseBadManners(t *testing.T) {
 
 func Test_UnecessaryRelease(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -170,9 +165,8 @@ func Test_UnecessaryRelease(t *testing.T) {
 
 func Test_UnecessaryAcquire(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -197,9 +191,8 @@ func Test_UnecessaryAcquire(t *testing.T) {
 
 func Test_CallbackError(t *testing.T) {
 	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
+		state:      make(map[string]*lock),
+		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -233,92 +226,4 @@ func Test_CallbackError(t *testing.T) {
 			t.Error("Expected client2 to have acquired the lock")
 		}
 	}
-}
-
-func Test_Cleanup(t *testing.T) {
-	v := &vaultImpl{
-		state:             make(map[string]*lock),
-		clientLookUpTable: make(map[string][]string),
-		queueLayer:        &tql{},
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-
-	t.Log("Initial lookup table state: ", v.clientLookUpTable)
-
-	v.Acquire("lt", "client", func(err error) error {
-		t.Log("Acquire lt client callback called with error:", err)
-		wg.Done()
-		return nil
-	})
-	t.Log(v.clientLookUpTable)
-
-	v.Acquire("lt2", "client", func(err error) error {
-		t.Log("Acquire lt2 client callback called with error:", err)
-		wg.Done()
-		return nil
-	})
-	t.Log(v.clientLookUpTable)
-
-	v.Acquire("lt3", "client", func(err error) error {
-		t.Log("Acquire lt3 client callback called with error:", err)
-		wg.Done()
-		return nil
-	})
-	wg.Wait()
-	t.Log(v.clientLookUpTable)
-
-	t.Log("Checking who owns 'lt'...")
-	l := v.state["lt"]
-	if l.owner != "client" && l.state != LOCKED {
-		t.Fatal("client does not have acquired lock")
-	}
-
-	lts, ok := v.clientLookUpTable["client"]
-	if !ok {
-		t.Fatal("Could not find client in client lookup table")
-	}
-
-	if len(lts) != 3 {
-		t.Fatal("Unexpected length of lock tags owner by client")
-	}
-	t.Log("Lock states before release: ", v.state)
-
-	wg.Add(1)
-
-	v.Release("lt3", "client", func(err error) error {
-		t.Log("Release lt3 client callback called with error:", err)
-		wg.Done()
-		return nil
-	})
-
-	wg.Wait()
-	t.Log(v.clientLookUpTable)
-
-	lts, ok = v.clientLookUpTable["client"]
-	if !ok {
-		t.Fatal("Could not find client in client lookup table")
-	}
-
-	if len(lts) != 2 {
-		t.Fatal("Unexpected length of lock tags owned by client")
-	}
-
-	v.Cleanup("client")
-	if v.state["lt"].owner != "" && v.state["lt"].state != UNLOCKED {
-		t.Error("Cleanup wasn't successful")
-	}
-	if v.state["lt2"].owner != "" && v.state["lt"].state != UNLOCKED {
-		t.Error("Cleanup wasn't successful")
-	}
-	if v.state["lt3"].owner != "" && v.state["lt"].state != UNLOCKED {
-		t.Error("Cleanup wasn't successful")
-	}
-
-	_, ok = v.clientLookUpTable["client"]
-	if ok {
-		t.Fatal("Client lookup table should have been cleared")
-	}
-	t.Log("Resulting lookup table after cleanup: ", v.clientLookUpTable)
-	t.Log("Resulting state after cleanup: ", v.state)
 }

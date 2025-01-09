@@ -2,64 +2,29 @@ package locksmith
 
 import (
 	"context"
+	"slices"
 	"testing"
+
+	"github.com/maansaake/locksmith/pkg/client"
+	"github.com/maansaake/locksmith/pkg/vault"
 )
 
-/*
-How to decode TCP packages received by the Locksmith server:
+func TestClientContext_addRemove(t *testing.T) {
+	clientCtx := &clientContext{lockTags: []string{"test1", "test2"}}
+	clientCtx.add("test3")
 
-In a loop:
+	if len(clientCtx.lockTags) != 3 {
+		t.Fatal("expected 3 lock tags, got ", len(clientCtx.lockTags))
+	}
 
-rest = []byte
-rest_index = 0
-buffer = []byte
+	clientCtx.remove("test2")
+	if len(clientCtx.lockTags) != 2 {
+		t.Fatal("expected 2 lock tags, got ", len(clientCtx.lockTags))
+	}
 
-// Read from connection
-while True:
-
-	pos = 0
-	n = read(buffer)
-
-	// Handle rest item first, rest_index being set means there was an overlap between packets we need to handle.
-	if rest_index > 0:
-		tag_size = int(rest[1])
-
-		// determine remaining lock tag characters to get from the buffer
-		// rest_index = 7
-		// 0 1 2 3 4 5 6
-		// 0 7 a a a a a
-		remaining_chars = tag_size - (rest_index - 2)
-		// remaining_chars will be = 2
-
-		rest_index = 0
-
-	while pos != n:
-
-		tag_size = int(buffer[pos + 1])
-
-		if (tag_size + 2) <= (n - pos):
-			handle_message(buffer[pos:pos+tag_size+2])
-
-			pos = pos + tag_size + 2
-		elif tag_size + 2 > n:
-			n_copied = copy(rest, buffer[pos:n])
-			rest_index = n_copied
-			pos = pos + n_copied
-*/
-func TestBytesBuffer(t *testing.T) {
-	buffer := make([]byte, 257)
-	read := []byte{1, 12, 3, 4, 5, 6, 7}
-
-	t.Log(int(read[1]))
-
-	buffer[4] = 12
-	t.Log(buffer)
-	t.Log(len(buffer))
-
-	copy(buffer, read[1:])
-	t.Log(buffer)
-	t.Log(len(buffer))
-
+	if -1 != slices.IndexFunc(clientCtx.lockTags, func(item string) bool { return item == "test2" }) {
+		t.Fatal("expected 'test2' to be removed")
+	}
 }
 
 func TestServer_Stop(t *testing.T) {
@@ -76,4 +41,49 @@ func TestServer_Stop(t *testing.T) {
 	}
 
 	t.Log("Locksmith stopped")
+}
+
+func TestServer_handleClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	locksmith := New(&LocksmithOptions{
+		Port:          30001,
+		QueueType:     vault.Single,
+		QueueCapacity: 1,
+	})
+	done := make(chan bool)
+
+	go func() {
+		err := locksmith.Start(ctx)
+		if err != nil {
+			t.Error("Error from Locksmith.Start: ", err)
+		}
+
+		done <- true
+	}()
+
+	acquired := make(chan bool)
+	onAcquired := func(lockTag string) {
+		if lockTag != "test" {
+			t.Fatal("expected locktag to be 'test', got ", lockTag)
+		}
+
+		acquired <- true
+	}
+
+	client := client.NewClient(&client.ClientOptions{Host: "localhost", Port: 30001, OnAcquired: onAcquired})
+	err := client.Connect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	err = client.Acquire("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-acquired
+
+	// clean up
+	cancel()
+	<-done
 }

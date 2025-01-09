@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+	"slices"
 
 	"github.com/maansaake/locksmith/pkg/connection"
 	"github.com/maansaake/locksmith/pkg/protocol"
@@ -13,27 +14,33 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Locksmith is the root level object containing the implementation of the Locksmith server.
-type Locksmith struct {
-	tcpAcceptor connection.TCPAcceptor
-	vault       vault.Vault
-}
+type (
+	// Locksmith is the root level object containing the implementation of the Locksmith server.
+	Locksmith struct {
+		tcpAcceptor connection.TCPAcceptor
+		vault       vault.Vault
+	}
+	// LocksmithOptions exposes the possible options to pass to a new Locksmith instance.
+	LocksmithOptions struct {
+		// Denotes the port which will listen for incoming connections.
+		Port uint16
+		// Selects the type of queue layer the vault will use.
+		QueueType vault.QueueType
+		// Sets the number of synchronization threads, the higher the number the less the chance of congestion.
+		QueueConcurrency int
+		// Determines the buffer size of each synchronization thread, after the buffer limit is reached, calls
+		// to the queue layer will block until the congestion is resolved.
+		QueueCapacity int
+		// TLS configuration for the TCP acceptor.
+		TlsConfig *tls.Config
+	}
+	clientContext struct {
+		conn     net.Conn
+		lockTags []string
+	}
+)
 
-// LocksmithOptions exposes the possible options to pass to a new Locksmith instance.
-type LocksmithOptions struct {
-	// Denotes the port which will listen for incoming connections.
-	Port uint16
-	// Selects the type of queue layer the vault will use.
-	QueueType vault.QueueType
-	// Sets the number of synchronization threads, the higher the number the less the chance of congestion.
-	QueueConcurrency int
-	// Determines the buffer size of each synchronization thread, after the buffer limit is reached, calls
-	// to the queue layer will block until the congestion is resolved.
-	QueueCapacity int
-	// TLS configuration for the TCP acceptor.
-	TlsConfig *tls.Config
-}
-
+// Create a new Locksmith instance with the provided options.
 func New(options *LocksmithOptions) *Locksmith {
 	locksmith := &Locksmith{
 		vault: vault.NewVault(&vault.VaultOptions{
@@ -79,15 +86,19 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 		Msg("connection accepted")
 
 	// On connection close, clean up client data
-	defer locksmith.vault.Cleanup(conn.RemoteAddr().String())
+	clientContext := &clientContext{
+		conn:     conn,
+		lockTags: []string{},
+	}
+	defer locksmith.cleanup(clientContext)
 
 	buffer := make([]byte, 257)
 	for {
-		n, err := conn.Read(buffer)
+		n, err := clientContext.conn.Read(buffer)
 		if err != nil {
 			if err == io.EOF {
 				log.Info().
-					Str("address", conn.RemoteAddr().String()).
+					Str("address", clientContext.conn.RemoteAddr().String()).
 					Msg("connection closed by remote (EOF)")
 			} else {
 				log.Error().
@@ -103,7 +114,7 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 
 		// TODO: handle multiple messages in buffer
 
-		incomingMessage, err := protocol.DecodeServerMessage(buffer[:n])
+		msg, err := protocol.DecodeServerMessage(buffer[:n])
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -112,31 +123,44 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 			break
 		}
 
-		locksmith.handleIncomingMessage(conn, incomingMessage)
+		locksmith.handleMsg(clientContext, msg)
 	}
+
+	// Close the connection, help cleanup in case of decoding issues.
+	// May return an error if the remote closed it, but that doesn't matter,
+	// ignore.
+	_ = clientContext.conn.Close()
 }
 
 // After decoding, this function determines the handling of the decoded
 // message.
-func (locksmith *Locksmith) handleIncomingMessage(
-	conn net.Conn,
+func (locksmith *Locksmith) handleMsg(
+	clientContext *clientContext,
 	serverMessage *protocol.ServerMessage,
 ) {
 	switch serverMessage.Type {
 	case protocol.Acquire:
 		locksmith.vault.Acquire(
 			serverMessage.LockTag,
-			conn.RemoteAddr().String(),
-			locksmith.acquireCallback(conn, serverMessage.LockTag),
+			clientContext.conn.RemoteAddr().String(),
+			locksmith.acquireCallback(clientContext.conn, serverMessage.LockTag),
 		)
+		clientContext.add(serverMessage.LockTag)
 	case protocol.Release:
 		locksmith.vault.Release(
 			serverMessage.LockTag,
-			conn.RemoteAddr().String(),
-			locksmith.releaseCallback(conn),
+			clientContext.conn.RemoteAddr().String(),
+			locksmith.releaseCallback(clientContext.conn),
 		)
+		clientContext.remove(serverMessage.LockTag)
 	default:
 		log.Error().Msg("invalid message type")
+	}
+}
+
+func (locksmith *Locksmith) cleanup(clientContext *clientContext) {
+	for _, lockTag := range clientContext.lockTags {
+		locksmith.vault.Cleanup(lockTag, clientContext.conn.RemoteAddr().String())
 	}
 }
 
@@ -182,4 +206,12 @@ func (locksmith *Locksmith) releaseCallback(
 
 		return nil
 	}
+}
+
+func (clientContext *clientContext) add(lockTag string) {
+	clientContext.lockTags = append(clientContext.lockTags, lockTag)
+}
+
+func (clientContext *clientContext) remove(lockTag string) {
+	clientContext.lockTags = slices.DeleteFunc(clientContext.lockTags, func(lt string) bool { return lt == lockTag })
 }
