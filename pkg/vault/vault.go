@@ -254,7 +254,7 @@ func (vault *vaultImpl) releaseAction(
 
 // Cleans up a locktag associated with a given client.
 func (vault *vaultImpl) Cleanup(lockTag, client string) {
-	log.Info().Str("client", client).Msg("cleaning up")
+	log.Info().Str("client", client).Str("tag", lockTag).Msg("cleaning up")
 	vault.queueLayer.Enqueue(
 		lockTag, vault.cleanupAction(client),
 	)
