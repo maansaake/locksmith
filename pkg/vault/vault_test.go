@@ -13,10 +13,9 @@ func (t *tql) Enqueue(locktag string, action func(string)) {
 }
 
 func Test_Acquire(t *testing.T) {
-	v := &vaultImpl{
-		state:      make(map[string]*lock),
-		queueLayer: &tql{},
-	}
+	vault := New(&Opts{})
+	v := vault.(*vaultImpl)
+	v.queueLayer = &tql{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -225,5 +224,44 @@ func Test_CallbackError(t *testing.T) {
 		if l.owner != "client2" || l.state != LOCKED {
 			t.Error("Expected client2 to have acquired the lock")
 		}
+	}
+}
+
+func TestVault_Cleanup(t *testing.T) {
+	v := &vaultImpl{queueLayer: &tql{}, state: make(map[string]*lock)}
+
+	l := v.fetch("test")
+	l.lock("client")
+
+	v.Cleanup("test", "client")
+
+	if l.isLocked() {
+		t.Fatal("lock was still locked")
+	}
+
+	if l.isOwner("client") {
+		t.Fatal("owner was still 'client'")
+	}
+}
+
+func TestVault_CleanupWaitlist(t *testing.T) {
+	vault := New(&Opts{QueueType: Single})
+	v := vault.(*vaultImpl)
+	v.queueLayer = &tql{}
+	v.state = make(map[string]*lock)
+
+	v.Acquire("test", "client", func(error) error { return nil })
+	v.Acquire("test", "client2", func(error) error { return nil })
+
+	v.Cleanup("test", "client")
+
+	l := v.fetch("test")
+
+	if !l.isLocked() {
+		t.Fatal("lock was not locked")
+	}
+
+	if !l.isOwner("client2") {
+		t.Fatal("owner was not 'client2'")
 	}
 }

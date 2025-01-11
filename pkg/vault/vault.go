@@ -169,6 +169,7 @@ func (vault *vaultImpl) acquireAction(
 	callback func(error) error,
 ) func(string) {
 	return func(lockTag string) {
+		log.Debug().Str("tag", lockTag).Str("client", client).Msg("acquire")
 		lock := vault.fetch(lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
@@ -225,6 +226,7 @@ func (vault *vaultImpl) releaseAction(
 	callback func(error) error,
 ) func(string) {
 	return func(lockTag string) {
+		log.Debug().Str("tag", lockTag).Str("client", client).Msg("release")
 		currentState := vault.fetch(lockTag)
 		// if already unlocked, kill the client for not following the protocol
 		//nolint:gocritic
@@ -266,7 +268,7 @@ func (vault *vaultImpl) Cleanup(lockTag, client string) {
 // handles the vault's lock states.
 func (vault *vaultImpl) cleanupAction(client string) func(string) {
 	return func(lockTag string) {
-		log.Debug().Str("tag", lockTag).Msg("cleanup")
+		log.Debug().Str("tag", lockTag).Str("client", client).Msg("cleanup")
 		if currentState := vault.fetch(lockTag); currentState.isOwner(client) {
 			currentState.unlock()
 			locksGauge.Dec()
@@ -291,14 +293,14 @@ func (vault *vaultImpl) fetch(lockTag string) *lock {
 // Waitlist the input action, related to the given lock tag. Appends the action
 // to the back of the waitlist of the lock tag.
 func (vault *vaultImpl) waitlist(lockTag string, callback func(string)) {
-	log.Debug().Str("tag", lockTag).Msg("waitlisting client")
+	log.Debug().Str("tag", lockTag).Msg("waitlisting")
 	_, ok := vault.waitList[lockTag]
 	if !ok {
 		vault.waitList[lockTag] = []*func(string){&callback}
 	} else {
 		vault.waitList[lockTag] = append(vault.waitList[lockTag], &callback)
 	}
-	log.Debug().Interface("waitlisted", len(vault.waitList[lockTag])).Send()
+	log.Debug().Str("tag", lockTag).Int("waitlisted", len(vault.waitList[lockTag])).Send()
 }
 
 // IMPORTANT: only call from synchronized Go-routines.
@@ -314,7 +316,7 @@ func (vault *vaultImpl) popWaitlist(lockTag string) {
 		} else {
 			vault.waitList[lockTag] = wl[1:]
 		}
-		log.Debug().Interface("waitlist", vault.waitList).Send()
+		log.Debug().Str("tag", lockTag).Interface("waitlisted", len(wl)-1).Send()
 
 		f := *first
 		f(lockTag)
