@@ -72,7 +72,7 @@ func TestServer_handleClient(t *testing.T) {
 		acquired <- true
 	}
 
-	client := client.New(&client.ClientOptions{
+	client := client.New(&client.Opts{
 		Host:       "localhost",
 		Port:       30001,
 		OnAcquired: onAcquired,

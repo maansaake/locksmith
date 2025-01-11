@@ -2,6 +2,7 @@
 package client
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -11,33 +12,33 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Client provides a simple interface for a Locksmith client.
-type Client interface {
-	Acquire(lockTag string) error
-	Release(lockTag string) error
-	Connect() error
-	Close()
-}
+type (
+	// Client provides a simple interface for a Locksmith client.
+	Client interface {
+		Acquire(lockTag string) error
+		Release(lockTag string) error
+		Connect() error
+		Close()
+	}
+	// Opts to provide at client instantiation.
+	Opts struct {
+		Host       string
+		Port       uint16
+		TlsConfig  *tls.Config
+		OnAcquired func(lockTag string)
+	}
+	// Implements the Client interface.
+	clientImpl struct {
+		host       string
+		port       uint16
+		tlsConfig  *tls.Config
+		onAcquired func(lockTag string)
+		conn       net.Conn
+		stop       chan interface{}
+	}
+)
 
-// ClientOptions to provide at client instantiation.
-type ClientOptions struct {
-	Host       string
-	Port       uint16
-	TlsConfig  *tls.Config
-	OnAcquired func(lockTag string)
-}
-
-// Implements the Client interface.
-type clientImpl struct {
-	host       string
-	port       uint16
-	tlsConfig  *tls.Config
-	onAcquired func(lockTag string)
-	conn       net.Conn
-	stop       chan interface{}
-}
-
-func New(options *ClientOptions) Client {
+func New(options *Opts) Client {
 	return &clientImpl{
 		host:       options.Host,
 		port:       options.Port,
@@ -51,84 +52,129 @@ func New(options *ClientOptions) Client {
 // Special note: if TLS version 13 is used, the Connect() function will not return an
 // error, even if something is wrong, until the first client write is issues. This is
 // because of how TLS 13 is implemented.
-func (clientImpl *clientImpl) Connect() (err error) {
-	address := fmt.Sprintf("%s:%d", clientImpl.host, clientImpl.port)
-	if clientImpl.tlsConfig != nil {
+func (c *clientImpl) Connect() (err error) {
+	address := fmt.Sprintf("%s:%d", c.host, c.port)
+	if c.tlsConfig != nil {
 		log.Info().
 			Str("address", address).
 			Msg("dialing (TLS) server")
-		clientImpl.conn, err = tls.Dial(
+		c.conn, err = tls.Dial(
 			"tcp",
 			address,
-			clientImpl.tlsConfig,
+			c.tlsConfig,
 		)
 	} else {
 		log.Info().
 			Str("address", address).
 			Msg("dialing server")
-		clientImpl.conn, err = net.Dial("tcp", address)
+		c.conn, err = net.Dial("tcp", address)
 	}
 	if err != nil {
 		return err
 	}
 	log.Info().Msg("connected")
 
-	go func(conn net.Conn) {
-		defer conn.Close()
-		buffer := make([]byte, 257)
-		for {
-			n, readErr := conn.Read(buffer)
-			if readErr != nil {
-				if readErr == io.EOF {
-					log.Info().
-						Str("address", conn.RemoteAddr().String()).
-						Msg("connection closed by remote (EOF)")
-				} else {
-					select {
-					case <-clientImpl.stop:
-						log.Info().Msg("stopping client connection gracefully")
-					default:
-						log.Error().
-							Err(readErr).
-							Msg("connection read error: ")
-					}
-				}
-
-				break
-			}
-
-			clientMessage, decodeErr := protocol.DecodeClientMessage(buffer[:n])
-			if decodeErr != nil {
-				log.Error().
-					Err(decodeErr).
-					Msg("failed to decode message")
-				continue
-			}
-
-			switch clientMessage.Type {
-			case protocol.Acquired:
-				clientImpl.onAcquired(clientMessage.LockTag)
-			default:
-				log.Error().
-					Str("type", string(clientMessage.Type)).
-					Msg("Client message type not recognized: ")
-			}
-		}
-	}(clientImpl.conn)
+	go c.handleConnection()
 
 	return nil
 }
 
+func (c *clientImpl) handleConnection() {
+	defer c.conn.Close()
+
+	read := make([]byte, 256)
+	buf := &bytes.Buffer{}
+	for {
+		n, err := c.conn.Read(read)
+		if err != nil {
+			if err == io.EOF {
+				log.Info().
+					Str("address", c.conn.RemoteAddr().String()).
+					Msg("connection closed by remote (EOF)")
+			} else {
+				select {
+				case <-c.stop:
+					log.Info().Msg("stopping client connection gracefully")
+				default:
+					log.Error().
+						Err(err).
+						Msg("connection read error: ")
+				}
+			}
+
+			break
+		}
+
+		log.Debug().Int("bytes", n).Msg("read from connection")
+		log.Debug().Bytes("read", read[:n]).Send()
+
+		buf.Write(read[:n])
+
+		if err := c.handleBuf(buf); err != nil {
+			log.Error().
+				Err(err).
+				Str("address", c.conn.RemoteAddr().String()).
+				Msg("message handling error, closing connection")
+			break
+		}
+	}
+}
+
+func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
+	contents := buf.Bytes()
+	i := 0
+	for {
+		// Minimum size of a server message is 3 bytes, for a locktag of 1 char.
+		if len(contents[i:]) < 3 {
+			return nil
+		}
+
+		// Peek the buffer, check message type and lock tag size. If the full lock
+		// tag size exists then a server message decode is done leading to a
+		// consequent message handling.
+		// Otherwise, put everything back in the buffer and return.
+
+		// No need to check msg type since they all currently have a locktag to
+		// verify.
+		// msgType := contents[i]
+		i++
+		lockTagSize := int(contents[i])
+		i++
+		if len(contents[i:]) < lockTagSize {
+			return nil
+		}
+
+		msg, err := protocol.DecodeClientMessage(buf.Next(lockTagSize + 2))
+		if err != nil {
+			return err
+		}
+		i += lockTagSize
+
+		c.handleMsg(msg)
+	}
+}
+
+func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
+	switch msg.Type {
+	case protocol.Acquired:
+		c.onAcquired(msg.LockTag)
+	default:
+		log.Error().
+			Str("type", string(msg.Type)).
+			Msg("Client message type not recognized: ")
+	}
+}
+
 // Close disconnects from the Locksmith instance.
-func (clientImpl *clientImpl) Close() {
-	close(clientImpl.stop)
-	clientImpl.conn.Close()
+func (c *clientImpl) Close() {
+	close(c.stop)
+	c.conn.Close()
 }
 
 // Acquire the given lock tag.
 // When the server responds, the onAcquired callback is called with the acquired lock tag.
-func (clientImpl *clientImpl) Acquire(lockTag string) error {
-	_, writeErr := clientImpl.conn.Write(
+func (c *clientImpl) Acquire(lockTag string) error {
+	_, writeErr := c.conn.Write(
 		protocol.EncodeServerMessage(
 			&protocol.ServerMessage{Type: protocol.Acquire, LockTag: lockTag},
 		),
@@ -138,8 +184,8 @@ func (clientImpl *clientImpl) Acquire(lockTag string) error {
 }
 
 // Release the given lock tag.
-func (clientImpl *clientImpl) Release(lockTag string) error {
-	_, writeErr := clientImpl.conn.Write(
+func (c *clientImpl) Release(lockTag string) error {
+	_, writeErr := c.conn.Write(
 		protocol.EncodeServerMessage(
 			&protocol.ServerMessage{Type: protocol.Release, LockTag: lockTag},
 		),

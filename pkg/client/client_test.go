@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -44,7 +45,7 @@ func Test_ClientLifecycle(t *testing.T) {
 		}
 	}()
 
-	client := New(&ClientOptions{Host: "localhost", Port: 30005})
+	client := New(&Opts{Host: "localhost", Port: 30005})
 	startErr := client.Connect()
 	if err != nil {
 		t.Fatal("Failed to start client:", startErr)
@@ -99,7 +100,7 @@ func Test_ClientAcquireRelease(t *testing.T) {
 		}
 	}()
 
-	client := New(&ClientOptions{Host: "localhost", Port: 30006})
+	client := New(&Opts{Host: "localhost", Port: 30006})
 	startErr := client.Connect()
 	if err != nil {
 		t.Fatal("Failed to start client:", startErr)
@@ -163,7 +164,7 @@ func Test_ClientOnAcquired(t *testing.T) {
 		}
 	}()
 
-	client := New(&ClientOptions{Host: "localhost", Port: 30007, OnAcquired: func(lockTag string) {
+	client := New(&Opts{Host: "localhost", Port: 30007, OnAcquired: func(lockTag string) {
 		if lockTag == EXPECTED_LOCK_TAG {
 			t.Log("OnAcquired called")
 			wg.Done()
@@ -288,4 +289,85 @@ func Test_MutualTls(t *testing.T) {
 
 	t.Log("waiting for listener to exit accept loop")
 	shutdownWg.Wait()
+}
+
+func TestClient_handleBuf(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 3, 3, 3})
+	buf.Write([]byte{0, 5, 10, 10, 3, 3, 3})
+	buf.Write([]byte{0, 10, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70})
+	buf.Write([]byte{0, 10, 70, 70, 70, 70, 70, 70, 70, 70, 70, 70})
+
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+
+	client := &clientImpl{onAcquired: func(lt string) {
+		wg.Done()
+	}}
+	err := client.handleBuf(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wg.Wait()
+}
+
+func TestClient_handleBufInvalidDecoding(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 0x80, 0xBF, 0})
+
+	client := &clientImpl{}
+	err := client.handleBuf(buf)
+	if err == nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClient_handleBufPartial(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 3, 3})
+
+	done := make(chan bool, 1)
+
+	client := &clientImpl{onAcquired: func(lt string) {
+		done <- true
+	}}
+	err := client.handleBuf(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf.Write([]byte{3})
+	err = client.handleBuf(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for acquire")
+	}
+}
+
+func TestClient_handleConnection(t *testing.T) {
+	done := make(chan bool, 1)
+
+	cpipe, spipe := net.Pipe()
+	client := New(&Opts{OnAcquired: func(lt string) {
+		done <- true
+	}})
+	c := client.(*clientImpl)
+	c.conn = cpipe
+
+	go c.handleConnection()
+	defer client.Close()
+
+	spipe.Write([]byte{0, 3, 70, 70, 70})
+
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for acquire")
+	}
 }

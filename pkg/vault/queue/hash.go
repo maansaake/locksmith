@@ -10,11 +10,3 @@ func fnv1aHash(str string) uint16 {
 	//nolint:gosec
 	return uint16(alg.Sum32() % 65535)
 }
-
-//nolint:unused,deadcode
-func fnv1Hash(str string) uint16 {
-	alg := fnv.New32()
-	alg.Write([]byte(str))
-	//nolint:gosec
-	return uint16(alg.Sum32() % 65535)
-}

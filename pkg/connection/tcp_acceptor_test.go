@@ -95,7 +95,7 @@ func TestTcpAcceptor_ClientEvictedNoTls(t *testing.T) {
 	}
 	defer tcpAcceptor.Stop()
 
-	c := client.New(&client.ClientOptions{
+	c := client.New(&client.Opts{
 		Host: "localhost",
 		Port: 30001,
 	})
@@ -157,7 +157,7 @@ func TestTcpAcceptor_MutualTls(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	c := client.New(&client.ClientOptions{
+	c := client.New(&client.Opts{
 		Host: "localhost",
 		Port: 30002,
 		TlsConfig: &tls.Config{

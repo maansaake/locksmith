@@ -61,8 +61,8 @@ func New(options *Opts) *Locksmith {
 
 // Starts the Locksmith instance. This is a blocking call that can be unblocked
 // by cancelling the provided context.
-func (locksmith *Locksmith) Start(ctx context.Context) error {
-	err := locksmith.tcpAcceptor.Start()
+func (l *Locksmith) Start(ctx context.Context) error {
+	err := l.tcpAcceptor.Start()
 	if err != nil {
 		log.Error().Msg("failed to start TCP acceptor")
 		return err
@@ -71,7 +71,7 @@ func (locksmith *Locksmith) Start(ctx context.Context) error {
 
 	<-ctx.Done()
 	log.Info().Msg("stopping locksmith")
-	locksmith.tcpAcceptor.Stop()
+	l.tcpAcceptor.Stop()
 
 	return err
 }
@@ -81,7 +81,7 @@ func (locksmith *Locksmith) Start(ctx context.Context) error {
 // error, either due to a problem or shutdown of the client connection. Gotten
 // messages will be attempted to be decoded, if decoding fails the loop is
 // broken and the client connection disconnected.
-func (locksmith *Locksmith) handleConnection(conn net.Conn) {
+func (l *Locksmith) handleConnection(conn net.Conn) {
 	log.Info().
 		Str("address", conn.RemoteAddr().String()).
 		Msg("connection accepted")
@@ -91,7 +91,7 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 		conn:     conn,
 		lockTags: []string{},
 	}
-	defer locksmith.cleanup(clientContext)
+	defer l.cleanup(clientContext)
 
 	read := make([]byte, 256)
 	buf := &bytes.Buffer{}
@@ -116,7 +116,7 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 
 		buf.Write(read[:n])
 
-		if err := locksmith.handleBuf(buf, clientContext); err != nil {
+		if err := l.handleBuf(buf, clientContext); err != nil {
 			log.Error().
 				Err(err).
 				Str("address", conn.RemoteAddr().String()).
@@ -124,14 +124,9 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 			break
 		}
 	}
-
-	// Close the connection, help cleanup in case of decoding issues.
-	// May return an error if the remote closed it, but that doesn't matter,
-	// ignore.
-	_ = clientContext.conn.Close()
 }
 
-func (locksmith *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientContext) error {
+func (l *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientContext) error {
 	contents := buf.Bytes()
 	i := 0
 	for {
@@ -161,29 +156,29 @@ func (locksmith *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientCo
 		}
 		i += lockTagSize
 
-		locksmith.handleMsg(clientContext, msg)
+		l.handleMsg(clientContext, msg)
 	}
 }
 
 // After decoding, this function determines the handling of the decoded
 // message.
-func (locksmith *Locksmith) handleMsg(
+func (l *Locksmith) handleMsg(
 	clientContext *clientContext,
 	serverMessage *protocol.ServerMessage,
 ) {
 	switch serverMessage.Type {
 	case protocol.Acquire:
-		locksmith.vault.Acquire(
+		l.vault.Acquire(
 			serverMessage.LockTag,
 			clientContext.conn.RemoteAddr().String(),
-			locksmith.acquireCallback(clientContext.conn, serverMessage.LockTag),
+			l.acquireCallback(clientContext.conn, serverMessage.LockTag),
 		)
 		clientContext.add(serverMessage.LockTag)
 	case protocol.Release:
-		locksmith.vault.Release(
+		l.vault.Release(
 			serverMessage.LockTag,
 			clientContext.conn.RemoteAddr().String(),
-			locksmith.releaseCallback(clientContext.conn),
+			l.releaseCallback(clientContext.conn),
 		)
 		clientContext.remove(serverMessage.LockTag)
 	default:
@@ -191,16 +186,17 @@ func (locksmith *Locksmith) handleMsg(
 	}
 }
 
-func (locksmith *Locksmith) cleanup(clientContext *clientContext) {
+func (l *Locksmith) cleanup(clientContext *clientContext) {
+	_ = clientContext.conn.Close()
 	for _, lockTag := range clientContext.lockTags {
-		locksmith.vault.Cleanup(lockTag, clientContext.conn.RemoteAddr().String())
+		l.vault.Cleanup(lockTag, clientContext.conn.RemoteAddr().String())
 	}
 }
 
 // Returns a callback function to call once a lock has been acquired, to send
 // feedback down the client connection. If the callback is called with an error,
 // the client has misbehaved in some way and needs to be disconnected.
-func (locksmith *Locksmith) acquireCallback(
+func (l *Locksmith) acquireCallback(
 	conn net.Conn,
 	lockTag string,
 ) func(error) error {
@@ -228,7 +224,7 @@ func (locksmith *Locksmith) acquireCallback(
 // Returns a callback function to call once a lock has been released. If the
 // callback is called with an error, the client has misbehaved in some way and
 // needs to be disconnected.
-func (locksmith *Locksmith) releaseCallback(
+func (l *Locksmith) releaseCallback(
 	conn net.Conn,
 ) func(error) error {
 	return func(err error) error {
@@ -241,10 +237,10 @@ func (locksmith *Locksmith) releaseCallback(
 	}
 }
 
-func (clientContext *clientContext) add(lockTag string) {
-	clientContext.lockTags = append(clientContext.lockTags, lockTag)
+func (cc *clientContext) add(lockTag string) {
+	cc.lockTags = append(cc.lockTags, lockTag)
 }
 
-func (clientContext *clientContext) remove(lockTag string) {
-	clientContext.lockTags = slices.DeleteFunc(clientContext.lockTags, func(lt string) bool { return lt == lockTag })
+func (cc *clientContext) remove(lockTag string) {
+	cc.lockTags = slices.DeleteFunc(cc.lockTags, func(lt string) bool { return lt == lockTag })
 }
