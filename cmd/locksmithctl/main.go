@@ -156,7 +156,7 @@ func initClient() error {
 		}
 	}
 
-	c = client.NewClient(&client.ClientOptions{
+	c = client.New(&client.ClientOptions{
 		Host: host,
 		//nolint:gosec
 		Port:      uint16(port),

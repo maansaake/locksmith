@@ -2,6 +2,7 @@
 package locksmith
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"io"
@@ -20,8 +21,8 @@ type (
 		tcpAcceptor connection.TCPAcceptor
 		vault       vault.Vault
 	}
-	// LocksmithOptions exposes the possible options to pass to a new Locksmith instance.
-	LocksmithOptions struct {
+	// Opts exposes the possible options to pass to a new Locksmith instance.
+	Opts struct {
 		// Denotes the port which will listen for incoming connections.
 		Port uint16
 		// Selects the type of queue layer the vault will use.
@@ -41,9 +42,9 @@ type (
 )
 
 // Create a new Locksmith instance with the provided options.
-func New(options *LocksmithOptions) *Locksmith {
+func New(options *Opts) *Locksmith {
 	locksmith := &Locksmith{
-		vault: vault.NewVault(&vault.VaultOptions{
+		vault: vault.New(&vault.Opts{
 			QueueType:        options.QueueType,
 			QueueConcurrency: options.QueueConcurrency,
 			QueueCapacity:    options.QueueCapacity,
@@ -92,9 +93,10 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 	}
 	defer locksmith.cleanup(clientContext)
 
-	buffer := make([]byte, 257)
+	read := make([]byte, 256)
+	buf := &bytes.Buffer{}
 	for {
-		n, err := clientContext.conn.Read(buffer)
+		n, err := clientContext.conn.Read(read)
 		if err != nil {
 			if err == io.EOF {
 				log.Info().
@@ -110,26 +112,57 @@ func (locksmith *Locksmith) handleConnection(conn net.Conn) {
 		}
 
 		log.Debug().Int("bytes", n).Msg("read from connection")
-		log.Debug().Bytes("buffer", buffer[:n]).Send()
+		log.Debug().Bytes("read", read[:n]).Send()
 
-		// TODO: handle multiple messages in buffer
+		buf.Write(read[:n])
 
-		msg, err := protocol.DecodeServerMessage(buffer[:n])
-		if err != nil {
+		if err := locksmith.handleBuf(buf, clientContext); err != nil {
 			log.Error().
 				Err(err).
 				Str("address", conn.RemoteAddr().String()).
-				Msg("decoding error, closing connection")
+				Msg("message handling error, closing connection")
 			break
 		}
-
-		locksmith.handleMsg(clientContext, msg)
 	}
 
 	// Close the connection, help cleanup in case of decoding issues.
 	// May return an error if the remote closed it, but that doesn't matter,
 	// ignore.
 	_ = clientContext.conn.Close()
+}
+
+func (locksmith *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientContext) error {
+	contents := buf.Bytes()
+	i := 0
+	for {
+		// Minimum size of a server message is 3 bytes, for a locktag of 1 char.
+		if len(contents[i:]) < 3 {
+			return nil
+		}
+
+		// Peek the buffer, check message type and lock tag size. If the full lock
+		// tag size exists then a server message decode is done leading to a
+		// consequent message handling.
+		// Otherwise, put everything back in the buffer and return.
+
+		// No need to check msg type since they all currently have a locktag to
+		// verify.
+		// msgType := contents[i]
+		i++
+		lockTagSize := int(contents[i])
+		i++
+		if len(contents[i:]) < lockTagSize {
+			return nil
+		}
+
+		msg, err := protocol.DecodeServerMessage(buf.Next(lockTagSize + 2))
+		if err != nil {
+			return err
+		}
+		i += lockTagSize
+
+		locksmith.handleMsg(clientContext, msg)
+	}
 }
 
 // After decoding, this function determines the handling of the decoded

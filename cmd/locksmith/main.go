@@ -98,7 +98,7 @@ func main() {
 	capacity, err := env.GetOptionalInteger(env.LOCKSMITH_Q_CAPACITY, env.LOCKSMITH_Q_CAPACITY_DEFAULT)
 	checkError(err)
 
-	locksmithOptions := &locksmith.LocksmithOptions{
+	locksmithOptions := &locksmith.Opts{
 		Port:             port,
 		QueueType:        vault.QueueType(queueType),
 		QueueConcurrency: concurrency,

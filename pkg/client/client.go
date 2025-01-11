@@ -37,7 +37,7 @@ type clientImpl struct {
 	stop       chan interface{}
 }
 
-func NewClient(options *ClientOptions) Client {
+func New(options *ClientOptions) Client {
 	return &clientImpl{
 		host:       options.Host,
 		port:       options.Port,
@@ -75,8 +75,8 @@ func (clientImpl *clientImpl) Connect() (err error) {
 
 	go func(conn net.Conn) {
 		defer conn.Close()
+		buffer := make([]byte, 257)
 		for {
-			buffer := make([]byte, 257)
 			n, readErr := conn.Read(buffer)
 			if readErr != nil {
 				if readErr == io.EOF {

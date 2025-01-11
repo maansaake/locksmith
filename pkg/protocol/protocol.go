@@ -57,19 +57,20 @@ func DecodeServerMessage(bytes []byte) (*ServerMessage, error) {
 	log.Debug().
 		Bytes("bytes", bytes).
 		Msg("decoding server message")
-	if len(bytes) < 3 || len(bytes) > 257 {
+	if len(bytes) < 3 || len(bytes) > 256 {
 		return nil, ErrServerMessageDecode
 	}
-	log.Debug().Str("tag", string(bytes[2:])).Send()
 	log.Debug().Int("tag-size", int(bytes[1])).Send()
 	if len(bytes[2:]) != int(bytes[1]) {
 		return nil, ErrLockTagSize
 	}
 	messageType, err := decodeServerMessageType(bytes)
+	log.Debug().Int("server-msg-type", int(messageType)).Send()
 	if err != nil {
 		return nil, err
 	}
 	lockTag, err := decodeLockTag(bytes)
+	log.Debug().Str("lock-tag", lockTag).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -99,19 +100,20 @@ func DecodeClientMessage(bytes []byte) (*ClientMessage, error) {
 	log.Debug().
 		Bytes("bytes", bytes).
 		Msg("decoding client message")
-	if len(bytes) < 3 || len(bytes) > 257 {
+	if len(bytes) < 3 || len(bytes) > 256 {
 		return nil, ErrClientMessageDecode
 	}
-	log.Debug().Str("tag", string(bytes[2:])).Send()
 	log.Debug().Int("tag-size", int(bytes[1])).Send()
 	if len(bytes[2:]) != int(bytes[1]) {
 		return nil, ErrLockTagSize
 	}
 	messageType, err := decodeClientMessageType(bytes)
+	log.Debug().Int("client-msg-type", int(messageType)).Send()
 	if err != nil {
 		return nil, err
 	}
 	lockTag, err := decodeLockTag(bytes)
+	log.Debug().Str("lock-tag", lockTag).Send()
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +168,8 @@ func decodeClientMessageType(bytes []byte) (ClientMessageType, error) {
 	return 0, ErrClientMessageType
 }
 
-// decodeLockTag check whether the input byte slice contains a valid lock tag and if so returns is as a string.
+// decodeLockTag check whether the input byte slice contains a valid lock tag
+// and if so returns is as a string.
 func decodeLockTag(bytes []byte) (string, error) {
 	lockTag := bytes[2:]
 	if !utf8.Valid(lockTag) {

@@ -44,7 +44,7 @@ func Test_ClientLifecycle(t *testing.T) {
 		}
 	}()
 
-	client := NewClient(&ClientOptions{Host: "localhost", Port: 30005})
+	client := New(&ClientOptions{Host: "localhost", Port: 30005})
 	startErr := client.Connect()
 	if err != nil {
 		t.Fatal("Failed to start client:", startErr)
@@ -99,7 +99,7 @@ func Test_ClientAcquireRelease(t *testing.T) {
 		}
 	}()
 
-	client := NewClient(&ClientOptions{Host: "localhost", Port: 30006})
+	client := New(&ClientOptions{Host: "localhost", Port: 30006})
 	startErr := client.Connect()
 	if err != nil {
 		t.Fatal("Failed to start client:", startErr)
@@ -163,7 +163,7 @@ func Test_ClientOnAcquired(t *testing.T) {
 		}
 	}()
 
-	client := NewClient(&ClientOptions{Host: "localhost", Port: 30007, OnAcquired: func(lockTag string) {
+	client := New(&ClientOptions{Host: "localhost", Port: 30007, OnAcquired: func(lockTag string) {
 		if lockTag == EXPECTED_LOCK_TAG {
 			t.Log("OnAcquired called")
 			wg.Done()

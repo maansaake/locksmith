@@ -111,7 +111,7 @@ const (
 	Multi  QueueType = "multi"
 )
 
-type VaultOptions struct {
+type Opts struct {
 	// Single queue mode should only be used for testing.
 	QueueType
 
@@ -126,7 +126,7 @@ type VaultOptions struct {
 	QueueCapacity int
 }
 
-func NewVault(options *VaultOptions) Vault {
+func New(options *Opts) Vault {
 	vault := &vaultImpl{
 		state:    make(map[string]*lock),
 		waitList: make(map[string][]*func(string)),

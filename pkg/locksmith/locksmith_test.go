@@ -1,7 +1,9 @@
 package locksmith
 
 import (
+	"bytes"
 	"context"
+	"net"
 	"slices"
 	"testing"
 
@@ -29,7 +31,7 @@ func TestClientContext_addRemove(t *testing.T) {
 
 func TestServer_Stop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	locksmith := New(&LocksmithOptions{Port: 30001})
+	locksmith := New(&Opts{Port: 30001})
 
 	go func() {
 		cancel()
@@ -45,7 +47,7 @@ func TestServer_Stop(t *testing.T) {
 
 func TestServer_handleClient(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	locksmith := New(&LocksmithOptions{
+	locksmith := New(&Opts{
 		Port:          30001,
 		QueueType:     vault.Single,
 		QueueCapacity: 1,
@@ -70,7 +72,11 @@ func TestServer_handleClient(t *testing.T) {
 		acquired <- true
 	}
 
-	client := client.NewClient(&client.ClientOptions{Host: "localhost", Port: 30001, OnAcquired: onAcquired})
+	client := client.New(&client.ClientOptions{
+		Host:       "localhost",
+		Port:       30001,
+		OnAcquired: onAcquired,
+	})
 	err := client.Connect()
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +89,168 @@ func TestServer_handleClient(t *testing.T) {
 	}
 	<-acquired
 
+	err = client.Release("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// clean up
 	cancel()
 	<-done
+}
+
+func TestServer_handleBuf(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 3, 3, 3})
+
+	vaultMock := &vault.Mock{}
+	locksmith := &Locksmith{
+		vault: vaultMock,
+	}
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	err := locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 1 {
+		t.Fatal("should be 1 acquire")
+	}
+
+	err = locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 1 {
+		t.Fatal("should be 1 acquire")
+	}
+}
+
+func TestServer_handleBufMultipleMessages(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 3, 3, 3})
+	buf.Write([]byte{0, 6, 3, 3, 3, 4, 5, 6})
+	buf.Write([]byte{1, 4, 3, 4, 5, 6})
+	buf.Write([]byte{1, 10, 49, 49, 49, 49, 49, 49, 3, 4, 5, 6})
+
+	vaultMock := vault.NewMock()
+	locksmith := &Locksmith{
+		vault: vaultMock,
+	}
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	t.Log("handling and clearing buffer")
+	err := locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 2 {
+		t.Fatal("should be 2 acquires:", vaultMock.AcquireCount)
+	}
+	if vaultMock.ReleaseCount != 2 {
+		t.Fatal("should be 2 releases:", vaultMock.ReleaseCount)
+	}
+
+	t.Log("second buffer clear with no new messages, nothing happens")
+	err = locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 2 {
+		t.Fatal("should be 2 acquires:", vaultMock.AcquireCount)
+	}
+
+	t.Log("third buffer clear with one new message")
+	buf.Write([]byte{0, 5, 70, 70, 70, 70, 70})
+	err = locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 3 {
+		t.Fatal("should be 3 acquires:", vaultMock.AcquireCount)
+	}
+}
+
+func TestServer_handleBufPartialMessage(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 3, 3})
+
+	vaultMock := vault.NewMock()
+	locksmith := &Locksmith{
+		vault: vaultMock,
+	}
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	err := locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 0 {
+		t.Fatal("should be 0 acquires:", vaultMock.AcquireCount)
+	}
+
+	buf.Write([]byte{3})
+
+	err = locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if vaultMock.AcquireCount != 1 {
+		t.Fatal("should be 1 acquires:", vaultMock.AcquireCount)
+	}
+}
+
+func TestServer_handleBufInvalidDecoding(t *testing.T) {
+	buf := &bytes.Buffer{}
+	buf.Write([]byte{0, 3, 0x80, 0xBF, 0})
+
+	vaultMock := vault.NewMock()
+	locksmith := &Locksmith{
+		vault: vaultMock,
+	}
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	err := locksmith.handleBuf(buf, &clientContext{conn: client})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+func TestServer_handleConnection(t *testing.T) {
+	vaultMock := vault.NewMock()
+	vaultMock.EnableAwaits()
+	locksmith := &Locksmith{
+		vault: vaultMock,
+	}
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	go locksmith.handleConnection(client)
+
+	server.Write([]byte{0, 3, 70, 70, 70})
+	err := vaultMock.AwaitAcquire("FFF")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server.Write([]byte{1, 3, 70, 70, 70})
+	err = vaultMock.AwaitRelease("FFF")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
