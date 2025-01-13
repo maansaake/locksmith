@@ -46,7 +46,7 @@ func NewMultiQueue(
 			log.Info().Int("number", i).Msg("starting multi queue go routine")
 			for {
 				qi := <-queue
-				qi.action(qi.lockTag)
+				qi.action(i, qi.lockTag)
 			}
 		}(i, ql.queues[i])
 	}
@@ -57,7 +57,7 @@ func NewMultiQueue(
 // Enqueue a lock tag, expect a call to the action once the queue layer has gotten
 // a hold of a synchronization Go-routine specific to the resulting hash of the
 // lock tag.
-func (multiQueue *multiQueue) Enqueue(lockTag string, action func(string)) {
+func (multiQueue *multiQueue) Enqueue(lockTag string, action func(int, string)) {
 	log.Debug().Str("tag", lockTag).Msg("generating hash and fetching queue index")
 	hash := multiQueue.hashFunc(lockTag)
 	queueIndex := multiQueue.queueIndexFromHash(hash)

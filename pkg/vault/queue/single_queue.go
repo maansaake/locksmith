@@ -14,12 +14,12 @@ func NewSingleQueue(
 		log.Info().Msg("started single queue")
 		for {
 			qi := <-q.queue
-			qi.action(qi.lockTag)
+			qi.action(0, qi.lockTag)
 		}
 	}()
 	return q
 }
 
-func (singleQueue *SingleQueue) Enqueue(lockTag string, action func(string)) {
+func (singleQueue *SingleQueue) Enqueue(lockTag string, action func(int, string)) {
 	singleQueue.queue <- &queueItem{lockTag: lockTag, action: action}
 }

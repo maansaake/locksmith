@@ -8,10 +8,10 @@ package queue
 // the provided callback.
 type QueueLayer interface {
 	// Request a Go-routine for the given lock tag.
-	Enqueue(lockTag string, action func(lockTag string))
+	Enqueue(lockTag string, action func(slot int, lockTag string))
 }
 
 type queueItem struct {
 	lockTag string
-	action  func(string)
+	action  func(int, string)
 }

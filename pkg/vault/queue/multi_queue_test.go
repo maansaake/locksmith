@@ -72,7 +72,7 @@ func Test_Enqueue(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(calls)
 	for i := 0; i < calls; i++ {
-		mq.Enqueue(randSeq(20), func(lockTag string) {
+		mq.Enqueue(randSeq(20), func(slot int, lockTag string) {
 			wg.Done()
 		})
 	}

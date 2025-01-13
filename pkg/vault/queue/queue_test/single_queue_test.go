@@ -20,7 +20,7 @@ func Test_SingleQueueTimeTaken(t *testing.T) {
 
 	t.Log("Starting to Enqueue", numEnqueues, "items at", time.Now())
 	for i := 0; i < numEnqueues; i++ {
-		sq.Enqueue(randSeq(50), func(lockTag string) {
+		sq.Enqueue(randSeq(50), func(slot int, lockTag string) {
 			time.Sleep(1 * time.Millisecond)
 			wg.Done()
 		})
@@ -41,7 +41,7 @@ func Test_Single_Enqueue(t *testing.T) {
 	wg.Add(expectedCallCount)
 
 	for i := 0; i < expectedCallCount; i++ {
-		q.Enqueue("lt", func(lockTag string) {
+		q.Enqueue("lt", func(slot int, lockTag string) {
 			wg.Done()
 		})
 	}

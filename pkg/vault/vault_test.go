@@ -8,12 +8,12 @@ import (
 
 type tql struct{}
 
-func (t *tql) Enqueue(locktag string, action func(string)) {
-	action(locktag)
+func (t *tql) Enqueue(locktag string, action func(int, string)) {
+	action(0, locktag)
 }
 
 func Test_Acquire(t *testing.T) {
-	vault := New(&Opts{})
+	vault := New(&Opts{QueueType: Single})
 	v := vault.(*vaultImpl)
 	v.queueLayer = &tql{}
 	wg := sync.WaitGroup{}
@@ -32,16 +32,15 @@ func Test_Acquire(t *testing.T) {
 		t.Error("Acquire callback wasn't called")
 	}
 
-	if li := v.fetch("lt"); !(li.isOwner("client") && li.isLocked()) {
+	if li := v.fetch(0, "lt"); !(li.isOwner("client") && li.isLocked()) {
 		t.Error("Expected client to be the owner and the lock to be locked")
 	}
 }
 
 func Test_Release(t *testing.T) {
-	v := &vaultImpl{
-		state:      make(map[string]*lock),
-		queueLayer: &tql{},
-	}
+	vault := New(&Opts{QueueType: Single})
+	v := vault.(*vaultImpl)
+	v.queueLayer = &tql{}
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
@@ -63,15 +62,15 @@ func Test_Release(t *testing.T) {
 		t.Error("Release callback wasn't called")
 	}
 
-	if li := v.fetch("lt"); li.isLocked() {
+	if li := v.fetch(0, "lt"); li.isLocked() {
 		t.Error("Expected the lock to not be.... well locked")
 	}
 }
 
 func Test_Waitlist(t *testing.T) {
 	v := &vaultImpl{
-		state:      make(map[string]*lock),
-		waitList:   make(map[string][]*func(string)),
+		slots:      []map[string]*lock{{}},
+		waitList:   make(map[string][]*func(int, string)),
 		queueLayer: &tql{},
 	}
 
@@ -118,7 +117,7 @@ func Test_Waitlist(t *testing.T) {
 
 func Test_ReleaseBadManners(t *testing.T) {
 	v := &vaultImpl{
-		state:      make(map[string]*lock),
+		slots:      []map[string]*lock{{}},
 		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
@@ -143,7 +142,7 @@ func Test_ReleaseBadManners(t *testing.T) {
 
 func Test_UnecessaryRelease(t *testing.T) {
 	v := &vaultImpl{
-		state:      make(map[string]*lock),
+		slots:      []map[string]*lock{{}},
 		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
@@ -164,7 +163,7 @@ func Test_UnecessaryRelease(t *testing.T) {
 
 func Test_UnecessaryAcquire(t *testing.T) {
 	v := &vaultImpl{
-		state:      make(map[string]*lock),
+		slots:      []map[string]*lock{{}},
 		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
@@ -190,7 +189,7 @@ func Test_UnecessaryAcquire(t *testing.T) {
 
 func Test_CallbackError(t *testing.T) {
 	v := &vaultImpl{
-		state:      make(map[string]*lock),
+		slots:      []map[string]*lock{{}},
 		queueLayer: &tql{},
 	}
 	wg := sync.WaitGroup{}
@@ -204,7 +203,7 @@ func Test_CallbackError(t *testing.T) {
 	})
 	wg.Wait()
 
-	if l, ok := v.state["lt"]; ok {
+	if l, ok := v.slots[0]["lt"]; ok {
 		if l.owner != "" || l.state != UNLOCKED {
 			t.Error("Unexpected lock state")
 		}
@@ -220,7 +219,7 @@ func Test_CallbackError(t *testing.T) {
 
 	wg.Wait()
 
-	if l, ok := v.state["lt"]; ok {
+	if l, ok := v.slots[0]["lt"]; ok {
 		if l.owner != "client2" || l.state != LOCKED {
 			t.Error("Expected client2 to have acquired the lock")
 		}
@@ -228,9 +227,9 @@ func Test_CallbackError(t *testing.T) {
 }
 
 func TestVault_Cleanup(t *testing.T) {
-	v := &vaultImpl{queueLayer: &tql{}, state: make(map[string]*lock)}
+	v := &vaultImpl{queueLayer: &tql{}, slots: []map[string]*lock{{}}}
 
-	l := v.fetch("test")
+	l := v.fetch(0, "test")
 	l.lock("client")
 
 	v.Cleanup("test", "client")
@@ -248,14 +247,13 @@ func TestVault_CleanupWaitlist(t *testing.T) {
 	vault := New(&Opts{QueueType: Single})
 	v := vault.(*vaultImpl)
 	v.queueLayer = &tql{}
-	v.state = make(map[string]*lock)
 
 	v.Acquire("test", "client", func(error) error { return nil })
 	v.Acquire("test", "client2", func(error) error { return nil })
 
 	v.Cleanup("test", "client")
 
-	l := v.fetch("test")
+	l := v.fetch(0, "test")
 
 	if !l.isLocked() {
 		t.Fatal("lock was not locked")

@@ -11,6 +11,48 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type (
+	// The Vault interface specifies high level functions to implement in order to
+	// handle the acquisition and release of mutexes.
+	Vault interface {
+		// Lock tag is a string identifying the lock to acquire, client the requesting party,
+		// and the callback a function which will be called to either confirm acquisition or
+		// including an error in case the client is misbehaving. The callback may return an
+		// error in case feedback handling encounters an error.
+		Acquire(lockTag, client string, callback func(error) error)
+		Release(lockTag, client string, callback func(error) error)
+		Cleanup(locktag, client string)
+	}
+	QueueType string
+	Opts      struct {
+		// Single queue mode should only be used for testing.
+		QueueType
+
+		// Only for multi-mode queues, determines the number of
+		// supporting Go-routines able to handle work given to the
+		// queueing layer.
+		QueueConcurrency int
+
+		// Sets the capacity of the underlying queue(s), the max amount
+		// of buffered work for a queue. In a multi queue setting, the
+		// capacity indicates the buffer size per queue.
+		QueueCapacity int
+	}
+	lockState bool
+	lock      struct {
+		owner string
+		state lockState
+	}
+	// Implementation of the Vault interface. By use of a queue layer, the vault ensures
+	// lock states are only manipulated from one Go-routine at a time. Read more in the
+	// QueueLayer interface description.
+	vaultImpl struct {
+		slots      []map[string]*lock
+		queueLayer queue.QueueLayer
+		waitList   map[string][]*func(slot int, lockTag string)
+	}
+)
+
 var (
 	ErrUnnecessaryAcquire = errors.New(
 		"client tried to acquire a lock that it already had acquired",
@@ -21,9 +63,7 @@ var (
 	ErrBadManners = errors.New(
 		"client tried to release lock that it did not own",
 	)
-)
 
-var (
 	locksGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "locksmith_total_locked_locks",
 		Help: "The total number of locked locks",
@@ -42,101 +82,30 @@ var (
 	}, []string{"reason"})
 )
 
-// The Vault interface specifies high level functions to implement in order to
-// handle the acquisition and release of mutexes.
-type Vault interface {
-	// Lock tag is a string identifying the lock to acquire, client the requesting party,
-	// and the callback a function which will be called to either confirm acquisition or
-	// including an error in case the client is misbehaving. The callback may return an
-	// error in case feedback handling encounters an error.
-	Acquire(lockTag, client string, callback func(error) error)
-	Release(lockTag, client string, callback func(error) error)
-	Cleanup(locktag, client string)
-}
-
-type lockState bool
-
 const (
+	Single QueueType = "single"
+	Multi  QueueType = "multi"
+
 	LOCKED   lockState = true
 	UNLOCKED lockState = false
 )
 
-type lock struct {
-	owner string
-	state lockState
-}
-
-func newlock() *lock {
-	return &lock{owner: "", state: UNLOCKED}
-}
-
-// implies lock is in LOCKED state
-func (l *lock) isOwner(client string) bool {
-	return l.owner == client
-}
-
-func (l *lock) isLocked() bool {
-	return l.state == LOCKED
-}
-
-func (l *lock) unlock() {
-	l.state = UNLOCKED
-	l.owner = ""
-}
-
-func (l *lock) lock(client string) {
-	l.state = LOCKED
-	l.owner = client
-}
-
-func (l *lock) String() string {
-	return fmt.Sprintf("&lock{c: %s, s: %v}", l.owner, l.state)
-}
-
-// Implementation of the Vault interface. By use of a queue layer, the vault ensures
-// lock states are only manipulated from one Go-routine at a time. Read more in the
-// QueueLayer interface description.
-type vaultImpl struct {
-	queueLayer queue.QueueLayer
-	state      map[string]*lock
-
-	// Waitlisted clients per lock.
-	waitList map[string][]*func(lockTag string)
-}
-
-type QueueType string
-
-const (
-	Single QueueType = "single"
-	Multi  QueueType = "multi"
-)
-
-type Opts struct {
-	// Single queue mode should only be used for testing.
-	QueueType
-
-	// Only for multi-mode queues, determines the number of
-	// supporting Go-routines able to handle work given to the
-	// queueing layer.
-	QueueConcurrency int
-
-	// Sets the capacity of the underlying queue(s), the max amount
-	// of buffered work for a queue. In a multi queue setting, the
-	// capacity indicates the buffer size per queue.
-	QueueCapacity int
-}
-
 func New(options *Opts) Vault {
 	vault := &vaultImpl{
-		state:    make(map[string]*lock),
-		waitList: make(map[string][]*func(string)),
+		waitList: make(map[string][]*func(int, string)),
 	}
 	if options.QueueType == Single {
 		vault.queueLayer = queue.NewSingleQueue(options.QueueCapacity)
+		vault.slots = make([]map[string]*lock, 1)
+		vault.slots[0] = map[string]*lock{}
 	} else {
 		vault.queueLayer = queue.NewMultiQueue(
 			options.QueueConcurrency, options.QueueCapacity,
 		)
+		vault.slots = make([]map[string]*lock, options.QueueConcurrency)
+		for i := range vault.slots {
+			vault.slots[i] = map[string]*lock{}
+		}
 	}
 
 	return vault
@@ -167,10 +136,10 @@ func (vault *vaultImpl) Acquire(
 func (vault *vaultImpl) acquireAction(
 	client string,
 	callback func(error) error,
-) func(string) {
-	return func(lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Msg("acquire")
-		lock := vault.fetch(lockTag)
+) func(int, string) {
+	return func(slot int, lockTag string) {
+		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("acquire")
+		lock := vault.fetch(slot, lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
 		//nolint:gocritic
@@ -181,7 +150,7 @@ func (vault *vaultImpl) acquireAction(
 
 			_ = callback(ErrUnnecessaryAcquire)
 
-			vault.popWaitlist(lockTag)
+			vault.popWaitlist(slot, lockTag)
 			// client didn't match, and the lock state is LOCKED, waitlist the
 			// client
 		} else if lock.isLocked() {
@@ -193,7 +162,7 @@ func (vault *vaultImpl) acquireAction(
 			// acquiring the lock has NW issues or something.
 			if err := callback(nil); err != nil {
 				// don't touch the lock state, pop from waitlist
-				vault.popWaitlist(lockTag)
+				vault.popWaitlist(slot, lockTag)
 			} else {
 				lock.lock(client)
 				locksGauge.Inc()
@@ -224,10 +193,10 @@ func (vault *vaultImpl) Release(
 func (vault *vaultImpl) releaseAction(
 	client string,
 	callback func(error) error,
-) func(string) {
-	return func(lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Msg("release")
-		currentState := vault.fetch(lockTag)
+) func(int, string) {
+	return func(slot int, lockTag string) {
+		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("release")
+		currentState := vault.fetch(slot, lockTag)
 		// if already unlocked, kill the client for not following the protocol
 		//nolint:gocritic
 		if !currentState.isLocked() {
@@ -249,7 +218,7 @@ func (vault *vaultImpl) releaseAction(
 
 			_ = callback(nil) // We don't care about release errors
 
-			vault.popWaitlist(lockTag)
+			vault.popWaitlist(slot, lockTag)
 		}
 	}
 }
@@ -266,24 +235,24 @@ func (vault *vaultImpl) Cleanup(lockTag, client string) {
 // This function must only be called from the scope of a synchronization
 // Go-routine, because just like the acquire- and releaseAction functions, it
 // handles the vault's lock states.
-func (vault *vaultImpl) cleanupAction(client string) func(string) {
-	return func(lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Msg("cleanup")
-		if currentState := vault.fetch(lockTag); currentState.isOwner(client) {
+func (vault *vaultImpl) cleanupAction(client string) func(int, string) {
+	return func(slot int, lockTag string) {
+		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("cleanup")
+		if currentState := vault.fetch(slot, lockTag); currentState.isOwner(client) {
 			currentState.unlock()
 			locksGauge.Dec()
 			releaseCounter.Inc()
 
-			vault.popWaitlist(lockTag)
+			vault.popWaitlist(slot, lockTag)
 		}
 	}
 }
 
-func (vault *vaultImpl) fetch(lockTag string) *lock {
-	lock, ok := vault.state[lockTag]
+func (vault *vaultImpl) fetch(slot int, lockTag string) *lock {
+	lock, ok := vault.slots[slot][lockTag]
 	if !ok {
 		lock = newlock()
-		vault.state[lockTag] = lock
+		vault.slots[slot][lockTag] = lock
 	}
 
 	return lock
@@ -292,11 +261,11 @@ func (vault *vaultImpl) fetch(lockTag string) *lock {
 // IMPORTANT: only call from synchronized Go-routines.
 // Waitlist the input action, related to the given lock tag. Appends the action
 // to the back of the waitlist of the lock tag.
-func (vault *vaultImpl) waitlist(lockTag string, callback func(string)) {
+func (vault *vaultImpl) waitlist(lockTag string, callback func(int, string)) {
 	log.Debug().Str("tag", lockTag).Msg("waitlisting")
 	_, ok := vault.waitList[lockTag]
 	if !ok {
-		vault.waitList[lockTag] = []*func(string){&callback}
+		vault.waitList[lockTag] = []*func(int, string){&callback}
 	} else {
 		vault.waitList[lockTag] = append(vault.waitList[lockTag], &callback)
 	}
@@ -306,7 +275,7 @@ func (vault *vaultImpl) waitlist(lockTag string, callback func(string)) {
 // IMPORTANT: only call from synchronized Go-routines.
 // Pop from the waitlist belonging to the input lock tag, results in a waitlisted
 // action being called directly.
-func (vault *vaultImpl) popWaitlist(lockTag string) {
+func (vault *vaultImpl) popWaitlist(slot int, lockTag string) {
 	log.Debug().Str("tag", lockTag).Msg("popping from waitlist")
 	if wl, ok := vault.waitList[lockTag]; ok && len(wl) > 0 {
 		first := wl[0]
@@ -319,8 +288,35 @@ func (vault *vaultImpl) popWaitlist(lockTag string) {
 		log.Debug().Str("tag", lockTag).Interface("waitlisted", len(wl)-1).Send()
 
 		f := *first
-		f(lockTag)
+		f(slot, lockTag)
 	} else {
 		log.Debug().Msg("no waitlisted clients found")
 	}
+}
+
+func newlock() *lock {
+	return &lock{owner: "", state: UNLOCKED}
+}
+
+// implies lock is in LOCKED state
+func (l *lock) isOwner(client string) bool {
+	return l.owner == client
+}
+
+func (l *lock) isLocked() bool {
+	return l.state == LOCKED
+}
+
+func (l *lock) unlock() {
+	l.state = UNLOCKED
+	l.owner = ""
+}
+
+func (l *lock) lock(client string) {
+	l.state = LOCKED
+	l.owner = client
+}
+
+func (l *lock) String() string {
+	return fmt.Sprintf("&lock{c: %s, s: %v}", l.owner, l.state)
 }
