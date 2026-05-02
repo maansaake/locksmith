@@ -22,7 +22,7 @@ const MAX = 65535
 
 func TestRangeDistribution_fnv1aHash(t *testing.T) {
 	distributionResult := make([]uint32, RANGES)
-	for i := 0; i < SAMPLE_SIZE; i++ {
+	for range SAMPLE_SIZE {
 		n := fnv1aHash(randSeq(SEQUENCE_SIZE))
 		if n < MAX/RANGES {
 			distributionResult[0]++
@@ -35,7 +35,7 @@ func TestRangeDistribution_fnv1aHash(t *testing.T) {
 		}
 	}
 
-	var previous uint32 = distributionResult[0]
+	var previous = distributionResult[0]
 	for _, val := range distributionResult[1:] {
 		if val > (previous+1000) || val < (previous-1000) {
 			t.Error("Distribution outside the allowed bounds")
@@ -46,7 +46,7 @@ func TestRangeDistribution_fnv1aHash(t *testing.T) {
 }
 
 func Benchmark_fnv1ahash(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		fnv1aHash(randSeq(52))
 	}
 }

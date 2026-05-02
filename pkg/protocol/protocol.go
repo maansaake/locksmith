@@ -80,11 +80,13 @@ func DecodeServerMessage(bytes []byte) (*ServerMessage, error) {
 
 // EncodeServerMessage converts a ServerMessage into a slice of bytes to be sent over a wire.
 func EncodeServerMessage(serverMessage *ServerMessage) []byte {
-	bytes := make([]byte, 2+len(serverMessage.LockTag))
+	const magic = 2
+	bytes := make([]byte, magic+len(serverMessage.LockTag))
 	bytes[0] = byte(serverMessage.Type)
+	//nolint:gosec // this is fine
 	bytes[1] = byte(len(serverMessage.LockTag))
-	for i := 0; i < len(serverMessage.LockTag); i++ {
-		bytes[i+2] = byte(serverMessage.LockTag[i])
+	for i := range len(serverMessage.LockTag) {
+		bytes[i+2] = serverMessage.LockTag[i]
 	}
 	return bytes
 }
@@ -121,15 +123,18 @@ func DecodeClientMessage(bytes []byte) (*ClientMessage, error) {
 	return &ClientMessage{Type: messageType, LockTag: lockTag}, nil
 }
 
-// EncodeServerMessage converts a ServerMessage into a slice of bytes to be sent over a wire.
+// EncodeClientMessage converts a ServerMessage into a slice of bytes to be sent over a wire.
 func EncodeClientMessage(clientMessage *ClientMessage) []byte {
+	const magic = 2
+
 	log.Debug().Msg("encoding client message")
-	bytes := make([]byte, 2+len(clientMessage.LockTag))
+	bytes := make([]byte, magic+len(clientMessage.LockTag))
 	log.Debug().Int("len", len(bytes)).Msg("made slice")
 	bytes[0] = byte(Acquired)
 	log.Debug().
 		Bytes("bytes", bytes).
 		Msg("added 'Acquired' message type")
+	//nolint:gosec // this is fine
 	bytes[1] = byte(len(clientMessage.LockTag))
 	log.Debug().
 		Bytes("bytes", bytes).
@@ -137,8 +142,8 @@ func EncodeClientMessage(clientMessage *ClientMessage) []byte {
 	log.Debug().
 		Str("tag", clientMessage.LockTag).
 		Msg("encoding lock tag")
-	for i := 0; i < len(clientMessage.LockTag); i++ {
-		bytes[i+2] = byte(clientMessage.LockTag[i])
+	for i := range len(clientMessage.LockTag) {
+		bytes[i+2] = clientMessage.LockTag[i]
 	}
 	log.Debug().
 		Bytes("bytes", bytes).
@@ -159,8 +164,10 @@ func decodeServerMessageType(bytes []byte) (ServerMessageType, error) {
 }
 
 // decodeserverMessageType attempts to extract the ClientMessageType from the given byte slice.
+//
+//nolint:unparam // why
 func decodeClientMessageType(bytes []byte) (ClientMessageType, error) {
-	//nolint:gocritic
+	//nolint:gocritic // why
 	switch ClientMessageType(bytes[0]) {
 	case Acquired:
 		return Acquired, nil

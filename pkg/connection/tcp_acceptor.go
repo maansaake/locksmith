@@ -17,7 +17,7 @@ type TCPAcceptor interface {
 type TCPAcceptorOptions struct {
 	Handler   func(net.Conn)
 	Port      uint16
-	TlsConfig *tls.Config
+	TLSConfig *tls.Config
 }
 
 type tcpAcceptorImpl struct {
@@ -32,7 +32,7 @@ func NewTCPAcceptor(options *TCPAcceptorOptions) TCPAcceptor {
 	return &tcpAcceptorImpl{
 		port:      options.Port,
 		handler:   options.Handler,
-		tlsConfig: options.TlsConfig,
+		tlsConfig: options.TLSConfig,
 		stop:      make(chan interface{}),
 	}
 }
@@ -40,8 +40,10 @@ func NewTCPAcceptor(options *TCPAcceptorOptions) TCPAcceptor {
 // Starts the TCP acceptor, returning any error that happened due to the call
 // to net/tls.Listen(...).
 // This is NOT a blocking call.
-func (tcpAcceptor *tcpAcceptorImpl) Start() (err error) {
+func (tcpAcceptor *tcpAcceptorImpl) Start() error {
+	var err error
 	if tcpAcceptor.tlsConfig == nil {
+		//nolint:noctx // TODO: fix
 		tcpAcceptor.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", tcpAcceptor.port))
 		log.Info().Uint16("port", tcpAcceptor.port).Msg("starting listener")
 	} else {
@@ -61,7 +63,7 @@ func (tcpAcceptor *tcpAcceptorImpl) Start() (err error) {
 func (tcpAcceptor *tcpAcceptorImpl) Stop() {
 	log.Info().Msg("stopping TCP acceptor")
 	close(tcpAcceptor.stop)
-	tcpAcceptor.listener.Close()
+	_ = tcpAcceptor.listener.Close()
 }
 
 // Listening loop for the TCP acceptor, is able to stop gracefully if Stop()

@@ -1,0 +1,62 @@
+name: Dependabot auto-approve
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'maansaake/locksmith'
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        with:
+          client-id: ${{ secrets.JEEVES_APP_ID }}
+          private-key: ${{ secrets.JEEVES_APP_PRIVATE_KEY }}
+
+      - name: Dependabot metadata
+        id: metadata
+        continue-on-error: true
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: "${{ steps.app-token.outputs.token }}"
+
+      - name: Enable auto-merge and approve minor/patch updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr review --approve "$PR_URL"
+          if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest == null')" = "true" ]; then
+            gh pr merge --auto -s "$PR_URL"
+          fi
+
+      - name: Re-approve after force-update if auto-merge was already configured
+        if: steps.metadata.outcome == 'failure' && github.event.action == 'synchronize'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # auto-merge being set means this PR was already approved as a minor/patch update
+          if [ "$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest == null')" = "false" ]; then
+            gh pr review --approve "$PR_URL"
+          fi
+
+      - name: Comment on major version updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr comment --body "This is a major version update. Please review the changes and merge when ready." "$PR_URL"

@@ -32,7 +32,7 @@ func Test_Acquire(t *testing.T) {
 		t.Error("Acquire callback wasn't called")
 	}
 
-	if li := v.fetch(0, "lt"); !(li.isOwner("client") && li.isLocked()) {
+	if li := v.fetch(0, "lt"); !li.isOwner("client") || !li.isLocked() {
 		t.Error("Expected client to be the owner and the lock to be locked")
 	}
 }

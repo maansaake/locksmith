@@ -1,0 +1,8 @@
+.git/
+.github/
+
+README.md
+LICENSE
+Makefile
+cmd/
+build/

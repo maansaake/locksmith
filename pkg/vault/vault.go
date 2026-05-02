@@ -48,7 +48,7 @@ type (
 	// QueueLayer interface description.
 	vaultImpl struct {
 		slots      []map[string]*lock
-		queueLayer queue.QueueLayer
+		queueLayer queue.Layer
 		waitList   map[string][]*func(slot int, lockTag string)
 	}
 )
@@ -64,22 +64,26 @@ var (
 		"client tried to release lock that it did not own",
 	)
 
+	//nolint:gochecknoglobals // welp
 	locksGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "locksmith_total_locked_locks",
+		Name: "locksmith_locked_locks",
 		Help: "The total number of locked locks",
 	})
+	//nolint:gochecknoglobals // welp
 	acquireCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "locksmith_acquires",
+		Name: "locksmith_acquire_total",
 		Help: "The number of processed acquires",
 	})
+	//nolint:gochecknoglobals // welp
 	releaseCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "locksmith_releases",
+		Name: "locksmith_release_total",
 		Help: "The number of processed releases",
 	})
+	//nolint:gochecknoglobals // welp
 	rejectionCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "locksmith_rejections",
+		Name: "locksmith_rejection_total",
 		Help: "The number of rejections due to bad manners and unnecessary releases/acquires",
-	}, []string{"reason"})
+	}, []string{counterReasonLabel})
 )
 
 const (
@@ -88,6 +92,8 @@ const (
 
 	LOCKED   lockState = true
 	UNLOCKED lockState = false
+
+	counterReasonLabel = "reason"
 )
 
 func New(options *Opts) Vault {
@@ -142,11 +148,11 @@ func (vault *vaultImpl) acquireAction(
 		lock := vault.fetch(slot, lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
-		//nolint:gocritic
+		//nolint:gocritic // why not
 		if lock.isOwner(client) {
 			lock.unlock()
 			locksGauge.Dec()
-			rejectionCounter.With(prometheus.Labels{"reason": "unnecessary_acquire"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_acquire"}).Inc()
 
 			_ = callback(ErrUnnecessaryAcquire)
 
@@ -198,15 +204,15 @@ func (vault *vaultImpl) releaseAction(
 		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("release")
 		currentState := vault.fetch(slot, lockTag)
 		// if already unlocked, kill the client for not following the protocol
-		//nolint:gocritic
+		//nolint:gocritic // why not
 		if !currentState.isLocked() {
-			rejectionCounter.With(prometheus.Labels{"reason": "unnecessary_release"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_release"}).Inc()
 
 			_ = callback(ErrUnnecessaryRelease)
 			// else, the lock is in LOCKED state, so check the owner, if
 			// client isn't the owner, it's misbehaving and needs to be killed
 		} else if !currentState.isOwner(client) {
-			rejectionCounter.With(prometheus.Labels{"reason": "bad_manners"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "bad_manners"}).Inc()
 
 			_ = callback(ErrBadManners)
 			// else, client is the owner of the lock, release it and call
@@ -298,7 +304,7 @@ func newlock() *lock {
 	return &lock{owner: "", state: UNLOCKED}
 }
 
-// implies lock is in LOCKED state
+// implies lock is in LOCKED state.
 func (l *lock) isOwner(client string) bool {
 	return l.owner == client
 }

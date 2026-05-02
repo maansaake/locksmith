@@ -81,7 +81,7 @@ func TestTcpAcceptor_ClientEvictedNoTls(t *testing.T) {
 			wg.Done()
 		},
 		Port: 30001,
-		TlsConfig: &tls.Config{
+		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 			ClientCAs:    pool,
@@ -106,7 +106,7 @@ func TestTcpAcceptor_ClientEvictedNoTls(t *testing.T) {
 	}
 	defer c.Close()
 
-	c.Acquire("abc") //nolint
+	c.Acquire("abc")
 	t.Log("Awaiting listener read...")
 	wg.Wait()
 }
@@ -139,7 +139,7 @@ func TestTcpAcceptor_MutualTls(t *testing.T) {
 			wg.Done()
 		},
 		Port: 30002,
-		TlsConfig: &tls.Config{
+		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 			ClientCAs:    pool,
@@ -160,7 +160,7 @@ func TestTcpAcceptor_MutualTls(t *testing.T) {
 	c := client.New(&client.Opts{
 		Host: "localhost",
 		Port: 30002,
-		TlsConfig: &tls.Config{
+		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{clientCert},
 			RootCAs:      pool,
 			MinVersion:   tls.VersionTLS13,
@@ -173,7 +173,7 @@ func TestTcpAcceptor_MutualTls(t *testing.T) {
 	}
 	defer c.Close()
 
-	c.Acquire("abc") //nolint
+	c.Acquire("abc")
 	t.Log("Awaiting listener read...")
 	wg.Wait()
 }

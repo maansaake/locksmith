@@ -4,9 +4,10 @@ package client
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
+	"errors"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/maansaake/locksmith/pkg/protocol"
 	"github.com/rs/zerolog/log"
@@ -24,7 +25,7 @@ type (
 	Opts struct {
 		Host       string
 		Port       uint16
-		TlsConfig  *tls.Config
+		TLSConfig  *tls.Config
 		OnAcquired func(lockTag string)
 	}
 	// Implements the Client interface.
@@ -42,7 +43,7 @@ func New(options *Opts) Client {
 	return &clientImpl{
 		host:       options.Host,
 		port:       options.Port,
-		tlsConfig:  options.TlsConfig,
+		tlsConfig:  options.TLSConfig,
 		onAcquired: options.OnAcquired,
 		stop:       make(chan interface{}),
 	}
@@ -52,12 +53,14 @@ func New(options *Opts) Client {
 // Special note: if TLS version 13 is used, the Connect() function will not return an
 // error, even if something is wrong, until the first client write is issues. This is
 // because of how TLS 13 is implemented.
-func (c *clientImpl) Connect() (err error) {
-	address := fmt.Sprintf("%s:%d", c.host, c.port)
+func (c *clientImpl) Connect() error {
+	var err error
+	address := net.JoinHostPort(c.host, strconv.FormatUint(uint64(c.port), 10))
 	if c.tlsConfig != nil {
 		log.Info().
 			Str("address", address).
 			Msg("dialing (TLS) server")
+		//nolint:noctx // TODO: fix
 		c.conn, err = tls.Dial(
 			"tcp",
 			address,
@@ -67,6 +70,7 @@ func (c *clientImpl) Connect() (err error) {
 		log.Info().
 			Str("address", address).
 			Msg("dialing server")
+		//nolint:noctx // TODO: fix
 		c.conn, err = net.Dial("tcp", address)
 	}
 	if err != nil {
@@ -80,14 +84,16 @@ func (c *clientImpl) Connect() (err error) {
 }
 
 func (c *clientImpl) handleConnection() {
+	const bufSize = 256
+
 	defer c.conn.Close()
 
-	read := make([]byte, 256)
+	read := make([]byte, bufSize)
 	buf := &bytes.Buffer{}
 	for {
 		n, err := c.conn.Read(read)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				log.Info().
 					Str("address", c.conn.RemoteAddr().String()).
 					Msg("connection closed by remote (EOF)")
@@ -110,6 +116,7 @@ func (c *clientImpl) handleConnection() {
 
 		buf.Write(read[:n])
 
+		//nolint:govet // TODO: look into
 		if err := c.handleBuf(buf); err != nil {
 			log.Error().
 				Err(err).
@@ -121,11 +128,13 @@ func (c *clientImpl) handleConnection() {
 }
 
 func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
+	const minMsgSize = 3
+
 	contents := buf.Bytes()
 	i := 0
 	for {
 		// Minimum size of a server message is 3 bytes, for a locktag of 1 char.
-		if len(contents[i:]) < 3 {
+		if len(contents[i:]) < minMsgSize {
 			return nil
 		}
 
@@ -144,7 +153,10 @@ func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
 			return nil
 		}
 
-		msg, err := protocol.DecodeClientMessage(buf.Next(lockTagSize + 2))
+		// Header size is 2 bytes, for the message type and lock tag size.
+		const headerSize = 2
+
+		msg, err := protocol.DecodeClientMessage(buf.Next(lockTagSize + headerSize))
 		if err != nil {
 			return err
 		}
@@ -168,7 +180,7 @@ func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
 // Close disconnects from the Locksmith instance.
 func (c *clientImpl) Close() {
 	close(c.stop)
-	c.conn.Close()
+	_ = c.conn.Close()
 }
 
 // Acquire the given lock tag.

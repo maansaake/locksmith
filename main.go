@@ -13,12 +13,12 @@ import (
 	"github.com/maansaake/locksmith/pkg/env"
 	locksmith "github.com/maansaake/locksmith/pkg/locksmith"
 	"github.com/maansaake/locksmith/pkg/vault"
-	"github.com/maansaake/locksmith/pkg/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+//nolint:funlen // what
 func main() {
 	// Set global log level
 	logLevel, _ := env.GetOptionalString(env.LOCKSMITH_LOG_LEVEL, env.LOCKSMITH_LOG_LEVEL_DEFAULT)
@@ -36,24 +36,22 @@ func main() {
 	checkError(err)
 
 	if console {
+		//nolint:reassign // welp
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: logOutput})
 	} else {
+		//nolint:reassign // welp
 		log.Logger = log.Output(logOutput)
 	}
 
-	// Print to bypass loglevel settings and write to stdout
-	// Check if '?' since the version info can only be set for container builds, not via 'go install'
-	if version.Version != "?" {
-		log.Info().
-			Str("version", version.Version).
-			Str("commit", version.Commit).
-			Str("built", version.Built).
-			Msg("starting Locksmith")
-	} else {
-		log.Info().Msg("starting locksmith")
-	}
+	version, _ := env.GetOptionalString(env.LOCKSMITH_VERSION, env.LOCKSMITH_VERSION_DEFAULT)
+	commit, _ := env.GetOptionalString(env.LOCKSMITH_VERSION, env.LOCKSMITH_VERSION_DEFAULT)
+	log.Info().
+		Str("version", version).
+		Str("commit", commit).
+		Msg("starting Locksmith")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Check if Prometheus metrics are enabled, start the metrics server if so.
 	var metricsServer *http.Server
@@ -65,6 +63,7 @@ func main() {
 		metricsServer = &http.Server{Addr: ":20000", ReadHeaderTimeout: 1 * time.Second}
 		go func() {
 			log.Info().Str("address", metricsServer.Addr).Msg("starting metrics server")
+			//nolint:govet // TODO: look into
 			if err := metricsServer.ListenAndServe(); err != http.ErrServerClosed {
 				log.Error().Err(err).Msg("metrics server failure")
 			} else {
@@ -74,11 +73,12 @@ func main() {
 	}
 
 	go func() {
-		signal_ch := make(chan os.Signal, 1)
-		signal.Notify(signal_ch, syscall.SIGINT, syscall.SIGTERM)
-		signal := <-signal_ch
+		signalch := make(chan os.Signal, 1)
+		signal.Notify(signalch, syscall.SIGINT, syscall.SIGTERM)
+		signal := <-signalch
 		log.Info().Any("signal", signal).Msg("captured stop signal")
 		if metrics {
+			//nolint:govet // TODO: look into
 			if err := metricsServer.Shutdown(ctx); err != nil {
 				log.Error().Err(err).Msg("error shutting down metrics server")
 			}
@@ -109,11 +109,13 @@ func main() {
 	checkError(err)
 
 	if tls {
-		locksmithOptions.TlsConfig = getTlsConfig()
+		locksmithOptions.TLSConfig = getTLSConfig()
 	}
 
+	//nolint:govet // TODO: look into
 	if err := locksmith.New(locksmithOptions).Start(ctx); err != nil {
 		log.Error().Err(err).Msg("server start error")
+		//nolint:gocritic // idk
 		os.Exit(1)
 	}
 
@@ -141,7 +143,7 @@ func translateToZerologLevel(level string) zerolog.Level {
 }
 
 // Fetch TLS config to supply the TCP listener.
-func getTlsConfig() *tls.Config {
+func getTLSConfig() *tls.Config {
 	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
 
 	serverCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)
@@ -155,11 +157,18 @@ func getTlsConfig() *tls.Config {
 
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	requireClientVerify, err := env.GetOptionalBool(env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT, env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT)
+	requireClientVerify, err := env.GetOptionalBool(
+		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT,
+		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT,
+	)
 	checkError(err)
 
 	if requireClientVerify {
-		clientCaCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH, env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT)
+		//nolint:govet // TODO: look into
+		clientCaCertPath, err := env.GetOptionalString(
+			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH,
+			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT,
+		)
 		checkError(err)
 
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert

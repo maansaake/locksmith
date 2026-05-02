@@ -24,7 +24,7 @@ func TestClientContext_addRemove(t *testing.T) {
 		t.Fatal("expected 2 lock tags, got ", len(clientCtx.lockTags))
 	}
 
-	if -1 != slices.IndexFunc(clientCtx.lockTags, func(item string) bool { return item == "test2" }) {
+	if slices.IndexFunc(clientCtx.lockTags, func(item string) bool { return item == "test2" }) != -1 {
 		t.Fatal("expected 'test2' to be removed")
 	}
 }
