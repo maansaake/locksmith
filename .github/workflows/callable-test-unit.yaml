@@ -36,7 +36,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: unit-test-${{ github.sha }}
+          key: unit-test-${{ steps.checksum.outputs.checksum }}
           restore-keys: unit-test-
 
       - name: Run tests

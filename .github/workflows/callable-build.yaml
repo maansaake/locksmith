@@ -37,7 +37,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: build-${{ github.sha }}
+          key: build-${{ steps.checksum.outputs.checksum }}
           restore-keys: build-
 
       - name: Build server binary
