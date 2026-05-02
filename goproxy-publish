@@ -1,6 +1,0 @@
-#! /bin/bash
-
-VERSION="$(git describe --tags --always --abbrev=0)"
-echo "publishing version $VERSION"
-
-GOPROXY=proxy.golang.org go list -m github.com/maansthoernvik/locksmith@$VERSION

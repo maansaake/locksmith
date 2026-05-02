@@ -13,13 +13,14 @@ permissions:
   security-events: write
 
 jobs:
-  go:
-    name: Golang
-    uses: ./.github/workflows/go.yaml
+  build:
+    uses: ./.github/workflows/callable-build.yaml
+
+  unit-test:
+    uses: ./.github/workflows/callable-test-unit.yaml
 
   image:
     name: Image
-    needs: go
     uses: ./.github/workflows/image.yaml
     with:
       push: false

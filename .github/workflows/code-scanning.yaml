@@ -1,4 +1,6 @@
-name: Linting
+name: Code scanning
+
+run-name: "Linting: ${{ github.event.head_commit.message }}"
 
 on:
   push:
@@ -13,7 +15,7 @@ permissions:
   security-events: write
 
 jobs:
-  go:
+  golangci-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -22,10 +24,11 @@ jobs:
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
           version: v2.12.0
+          working-directory: sample-go-app
           args: --output.sarif.path=results.sarif
 
       - name: Upload SARIF report
         if: always()
         uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.53.3
         with:
-          sarif_file: results.sarif
+          sarif_file: sample-go-app/results.sarif

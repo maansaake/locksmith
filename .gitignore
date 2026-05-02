@@ -20,3 +20,6 @@ client/client
 
 # Go workspace file
 go.work
+
+# Build output
+build/
