@@ -8,7 +8,7 @@ import (
 func Test_queueIndexDistribution(t *testing.T) {
 	numQueues := 1000
 	mq := &multiQueue{
-		queues:   make([]chan *queueItem, numQueues),
+		queues:   make([]chan *item, numQueues),
 		hashFunc: fnv1aHash,
 	}
 
@@ -52,7 +52,7 @@ func Test_queueIndexDistribution(t *testing.T) {
 }
 
 func Test_queueIndexFromHash(t *testing.T) {
-	mq := &multiQueue{queues: make([]chan *queueItem, 10)}
+	mq := &multiQueue{queues: make([]chan *item, 10)}
 
 	qi := mq.queueIndexFromHash(65535)
 	if qi >= uint16(len(mq.queues)) {
@@ -83,7 +83,7 @@ func Test_Enqueue(t *testing.T) {
 const BENCHMARKING_SEQUENCE_SIZE = 100
 
 func Benchmark_queueIndex(b *testing.B) {
-	mq := &multiQueue{queues: make([]chan *queueItem, 10)}
+	mq := &multiQueue{queues: make([]chan *item, 10)}
 
 	b.Run("Standard", func(b *testing.B) {
 		for range b.N {

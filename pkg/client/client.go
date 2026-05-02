@@ -25,7 +25,7 @@ type (
 	Opts struct {
 		Host       string
 		Port       uint16
-		TlsConfig  *tls.Config
+		TLSConfig  *tls.Config
 		OnAcquired func(lockTag string)
 	}
 	// Implements the Client interface.
@@ -43,7 +43,7 @@ func New(options *Opts) Client {
 	return &clientImpl{
 		host:       options.Host,
 		port:       options.Port,
-		tlsConfig:  options.TlsConfig,
+		tlsConfig:  options.TLSConfig,
 		onAcquired: options.OnAcquired,
 		stop:       make(chan interface{}),
 	}

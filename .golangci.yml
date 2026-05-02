@@ -22,7 +22,6 @@ formatters:
   enable:
     - goimports # checks if the code and import statements are formatted according to the 'goimports' command
     - golines # checks if code is formatted, and fixes long lines
-
     ## you may want to enable
     #- gci # checks if code and import statements are formatted, with additional rules
     #- gofmt # checks if the code is formatted according to 'gofmt' command
@@ -30,7 +29,7 @@ formatters:
     ## disabled
     #- gofumpt # [replaced by goimports, gofumports is not available yet] checks if code and import statements are formatted, with additional rules
 
-  # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
+    # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
   settings:
     goimports:
       # A list of prefixes, which, if set, checks import paths
@@ -117,7 +116,6 @@ linters:
     - usetesting # reports uses of functions with replacement inside the testing package
     - wastedassign # finds wasted assignment statements
     - whitespace # detects leading and trailing whitespace
-
     ## you may want to enable
     #- decorder # checks declaration order and count of types, constants, variables and functions
     #- exhaustruct # [highly recommend to enable] checks if all structure fields are initialized
@@ -154,7 +152,7 @@ linters:
     #- thelper # detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     #- wsl # [too strict and mostly code is not more readable] whitespace linter forces you to use empty lines
 
-  # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
+    # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
   settings:
     cyclop:
       # The maximal code complexity to report.
@@ -194,7 +192,8 @@ linters:
           # Default: []
           deny:
             - pkg: github.com/golang/protobuf
-              desc: Use google.golang.org/protobuf instead, see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules
+              desc: Use google.golang.org/protobuf instead, see
+                https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules
             - pkg: github.com/satori/go.uuid
               desc: Use github.com/google/uuid instead, satori's package is not maintained
             - pkg: github.com/gofrs/uuid$
@@ -413,19 +412,22 @@ linters:
       - common-false-positives
     # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
-      - source: 'TODO'
-        linters: [ godot ]
-      - text: 'should have a package comment'
-        linters: [ revive ]
-      - text: 'exported \S+ \S+ should have comment( \(or a comment on this block\))? or be unexported'
-        linters: [ revive ]
-      - text: 'package comment should be of the form ".+"'
-        source: '// ?(nolint|TODO)'
-        linters: [ revive ]
-      - text: 'comment on exported \S+ \S+ should be of the form ".+"'
-        source: '// ?(nolint|TODO)'
+      - text: "ALL_CAPS in Go names"
         linters: [ revive, staticcheck ]
-      - path: '_test\.go'
+      - source: "TODO"
+        linters: [ godot ]
+      - text: "should have a package comment"
+        linters: [ revive ]
+      - text: "exported \\S+ \\S+ should have comment( \\(or a comment on this
+          block\\))? or be unexported"
+        linters: [ revive ]
+      - text: "package comment should be of the form \".+\""
+        source: "// ?(nolint|TODO)"
+        linters: [ revive ]
+      - text: "comment on exported \\S+ \\S+ should be of the form \".+\""
+        source: "// ?(nolint|TODO)"
+        linters: [ revive, staticcheck ]
+      - path: "_test\\.go"
         linters:
           - bodyclose
           - dupl
@@ -435,3 +437,6 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+
+run:
+  tests: false

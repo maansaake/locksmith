@@ -17,7 +17,7 @@ type TCPAcceptor interface {
 type TCPAcceptorOptions struct {
 	Handler   func(net.Conn)
 	Port      uint16
-	TlsConfig *tls.Config
+	TLSConfig *tls.Config
 }
 
 type tcpAcceptorImpl struct {
@@ -32,7 +32,7 @@ func NewTCPAcceptor(options *TCPAcceptorOptions) TCPAcceptor {
 	return &tcpAcceptorImpl{
 		port:      options.Port,
 		handler:   options.Handler,
-		tlsConfig: options.TlsConfig,
+		tlsConfig: options.TLSConfig,
 		stop:      make(chan interface{}),
 	}
 }

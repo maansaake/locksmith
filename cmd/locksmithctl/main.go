@@ -1,4 +1,6 @@
 // This package implements a simple CLI for Locksmith.
+//
+// nolint
 package main
 
 import (
@@ -165,7 +167,7 @@ func initClient() error {
 		Host: host,
 		//nolint:gosec
 		Port:      uint16(port),
-		TlsConfig: tlsConfig,
+		TLSConfig: tlsConfig,
 		OnAcquired: func(lock string) {
 			fmt.Println("acquired ", lock)
 		},

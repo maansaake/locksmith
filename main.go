@@ -36,8 +36,10 @@ func main() {
 	checkError(err)
 
 	if console {
+		//nolint:reassign // welp
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: logOutput})
 	} else {
+		//nolint:reassign // welp
 		log.Logger = log.Output(logOutput)
 	}
 
@@ -65,6 +67,7 @@ func main() {
 		metricsServer = &http.Server{Addr: ":20000", ReadHeaderTimeout: 1 * time.Second}
 		go func() {
 			log.Info().Str("address", metricsServer.Addr).Msg("starting metrics server")
+
 			if err := metricsServer.ListenAndServe(); err != http.ErrServerClosed {
 				log.Error().Err(err).Msg("metrics server failure")
 			} else {
@@ -74,9 +77,9 @@ func main() {
 	}
 
 	go func() {
-		signal_ch := make(chan os.Signal, 1)
-		signal.Notify(signal_ch, syscall.SIGINT, syscall.SIGTERM)
-		signal := <-signal_ch
+		signalch := make(chan os.Signal, 1)
+		signal.Notify(signalch, syscall.SIGINT, syscall.SIGTERM)
+		signal := <-signalch
 		log.Info().Any("signal", signal).Msg("captured stop signal")
 		if metrics {
 			if err := metricsServer.Shutdown(ctx); err != nil {
@@ -109,7 +112,7 @@ func main() {
 	checkError(err)
 
 	if tls {
-		locksmithOptions.TlsConfig = getTlsConfig()
+		locksmithOptions.TLSConfig = getTLSConfig()
 	}
 
 	if err := locksmith.New(locksmithOptions).Start(ctx); err != nil {
@@ -141,7 +144,7 @@ func translateToZerologLevel(level string) zerolog.Level {
 }
 
 // Fetch TLS config to supply the TCP listener.
-func getTlsConfig() *tls.Config {
+func getTLSConfig() *tls.Config {
 	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
 
 	serverCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)

@@ -22,27 +22,27 @@ import (
 // This method ensures the same index channel always handles the same hash(es),
 // and eliminates race conditions between clients of Locksmith.
 type multiQueue struct {
-	queues   []chan *queueItem
+	queues   []chan *item
 	hashFunc func(string) uint16
 }
 
-// Creates a QueueLayer with multiple underlying go routines for quicker
+// NewMultiQueue creates a QueueLayer with multiple underlying go routines for quicker
 // dispatch of lock acquisitions and releases. To dispatch, each lock tag
 // is hashed into a number, each queue handles a range.
 func NewMultiQueue(
 	concurrency int,
 	capacity int,
-) QueueLayer {
+) Layer {
 	ql := &multiQueue{
-		queues:   make([]chan *queueItem, concurrency),
+		queues:   make([]chan *item, concurrency),
 		hashFunc: fnv1aHash,
 	}
 
 	// Initialize queues, queue[0] is responsible for the range 0 -> 65535 / numQueues and so on
 	for i := range concurrency {
-		ql.queues[i] = make(chan *queueItem, capacity)
+		ql.queues[i] = make(chan *item, capacity)
 
-		go func(i int, queue chan *queueItem) {
+		go func(i int, queue chan *item) {
 			log.Info().Int("number", i).Msg("starting multi queue go routine")
 			for {
 				qi := <-queue
@@ -65,7 +65,7 @@ func (multiQueue *multiQueue) Enqueue(lockTag string, action func(int, string)) 
 		Uint16("hash", hash).
 		Int("queue-index", int(queueIndex)).
 		Msg("enqueueing")
-	multiQueue.queues[queueIndex] <- &queueItem{lockTag: lockTag, action: action}
+	multiQueue.queues[queueIndex] <- &item{lockTag: lockTag, action: action}
 }
 
 // Get a queue index from an input hash to select which queue should handle an

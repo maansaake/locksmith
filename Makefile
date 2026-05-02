@@ -8,3 +8,6 @@ buildctl:
 
 lint:
 	golangci-lint run --fix
+
+unit-test:
+	go test ./... -failfast

@@ -1,4 +1,4 @@
-// Package server ties together the Locksmith server logic.
+// Package locksmith ties together the Locksmith server logic.
 package locksmith
 
 import (
@@ -24,17 +24,21 @@ type (
 	}
 	// Opts exposes the possible options to pass to a new Locksmith instance.
 	Opts struct {
-		// Denotes the port which will listen for incoming connections.
+		// Port denotes the port which will listen for incoming connections.
 		Port uint16
-		// Selects the type of queue layer the vault will use.
+
+		// QueueType selects the type of queue layer the vault will use.
 		QueueType vault.QueueType
-		// Sets the number of synchronization threads, the higher the number the less the chance of congestion.
+
+		// QueueConcurrency sets the number of synchronization threads, the higher the number the less the chance of congestion.
 		QueueConcurrency int
-		// Determines the buffer size of each synchronization thread, after the buffer limit is reached, calls
+
+		// QueueCapacity determines the buffer size of each synchronization thread, after the buffer limit is reached, calls
 		// to the queue layer will block until the congestion is resolved.
 		QueueCapacity int
-		// TLS configuration for the TCP acceptor.
-		TlsConfig *tls.Config
+
+		// TLSConfig for the TCP acceptor.
+		TLSConfig *tls.Config
 	}
 	clientContext struct {
 		conn     net.Conn
@@ -42,7 +46,7 @@ type (
 	}
 )
 
-// Create a new Locksmith instance with the provided options.
+// New creates a new Locksmith instance with the provided options.
 func New(options *Opts) *Locksmith {
 	locksmith := &Locksmith{
 		vault: vault.New(&vault.Opts{
@@ -54,13 +58,13 @@ func New(options *Opts) *Locksmith {
 	locksmith.tcpAcceptor = connection.NewTCPAcceptor(&connection.TCPAcceptorOptions{
 		Handler:   locksmith.handleConnection,
 		Port:      options.Port,
-		TlsConfig: options.TlsConfig,
+		TLSConfig: options.TLSConfig,
 	})
 
 	return locksmith
 }
 
-// Starts the Locksmith instance. This is a blocking call that can be unblocked
+// Start the Locksmith instance. This is a blocking call that can be unblocked
 // by cancelling the provided context.
 func (l *Locksmith) Start(ctx context.Context) error {
 	err := l.tcpAcceptor.Start()

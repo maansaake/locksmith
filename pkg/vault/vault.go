@@ -48,7 +48,7 @@ type (
 	// QueueLayer interface description.
 	vaultImpl struct {
 		slots      []map[string]*lock
-		queueLayer queue.QueueLayer
+		queueLayer queue.Layer
 		waitList   map[string][]*func(slot int, lockTag string)
 	}
 )
