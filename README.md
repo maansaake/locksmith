@@ -2,7 +2,7 @@
 
 [![Main branch protection](https://github.com/maansaake/locksmith/actions/workflows/main.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/main.yaml)
 [![Code scanning](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml)
-![tag](https://img.shields.io/github/v/tag/maansthoernvik/locksmith?label=latest%20version)
+![tag](https://img.shields.io/github/v/tag/maansaake/locksmith?label=latest%20version)
 
 - [Install](#install)
 - [How to run](#how-to-run)
@@ -25,7 +25,7 @@ The locksmith server can be installed in two different ways. To get the server c
 docker pull ghcr.io/maansaake/locksmith:latest
 ```
 
-*You can browse available versions here: <https://github.com/maansthoernvik/locksmith/pkgs/container/locksmith>*
+*You can browse available versions here: <https://github.com/maansaake/locksmith/pkgs/container/locksmith>*
 
 Run `go install` to instead get the server binary, make sure you have set either `GOPATH` or `GOBIN`.
 
