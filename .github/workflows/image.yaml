@@ -1,5 +1,7 @@
 name: Image
 
+run-name: "Build image: ${{ inputs.version || github.ref_name }}"
+
 on:
   workflow_call:
     inputs:
