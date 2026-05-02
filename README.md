@@ -22,7 +22,7 @@ This project provides both server software, a command line utility, and a sample
 The locksmith server can be installed in two different ways. To get the server container image, run:
 
 ```bash
-docker pull ghcr.io/maansthoernvik/locksmith:latest
+docker pull ghcr.io/maansaake/locksmith:latest
 ```
 
 *You can browse available versions here: <https://github.com/maansthoernvik/locksmith/pkgs/container/locksmith>*
