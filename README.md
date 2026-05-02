@@ -1,8 +1,7 @@
 # Locksmith <!-- omit in toc -->
 
-
-![build](https://github.com/maansaake/locksmith/actions/workflows/build.yml/badge.svg)
-[![codecov](https://codecov.io/gh/maansaake/locksmith/graph/badge.svg?token=6MrGbVWC5b)](https://codecov.io/gh/maansaake/locksmith)
+[![Main branch protection](https://github.com/maansaake/locksmith/actions/workflows/main.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/main.yaml)
+[![Code scanning](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml)
 ![tag](https://img.shields.io/github/v/tag/maansthoernvik/locksmith?label=latest%20version)
 
 - [Install](#install)
