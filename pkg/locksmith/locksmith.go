@@ -87,6 +87,8 @@ func (l *Locksmith) Start(ctx context.Context) error {
 // messages will be attempted to be decoded, if decoding fails the loop is
 // broken and the client connection disconnected.
 func (l *Locksmith) handleConnection(conn net.Conn) {
+	const bufSize = 256
+
 	log.Info().
 		Str("address", conn.RemoteAddr().String()).
 		Msg("connection accepted")
@@ -98,7 +100,7 @@ func (l *Locksmith) handleConnection(conn net.Conn) {
 	}
 	defer l.cleanup(clientContext)
 
-	read := make([]byte, 256)
+	read := make([]byte, bufSize)
 	buf := &bytes.Buffer{}
 	for {
 		n, err := clientContext.conn.Read(read)
@@ -121,6 +123,7 @@ func (l *Locksmith) handleConnection(conn net.Conn) {
 
 		buf.Write(read[:n])
 
+		//nolint:govet // TODO: look into
 		if err := l.handleBuf(buf, clientContext); err != nil {
 			log.Error().
 				Err(err).
@@ -132,11 +135,13 @@ func (l *Locksmith) handleConnection(conn net.Conn) {
 }
 
 func (l *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientContext) error {
+	const minMsgSize = 3
+
 	contents := buf.Bytes()
 	i := 0
 	for {
 		// Minimum size of a server message is 3 bytes, for a locktag of 1 char.
-		if len(contents[i:]) < 3 {
+		if len(contents[i:]) < minMsgSize {
 			return nil
 		}
 
@@ -155,7 +160,10 @@ func (l *Locksmith) handleBuf(buf *bytes.Buffer, clientContext *clientContext) e
 			return nil
 		}
 
-		msg, err := protocol.DecodeServerMessage(buf.Next(lockTagSize + 2))
+		// Header size is 2 bytes, for the message type and lock tag size.
+		const headerSize = 2
+
+		msg, err := protocol.DecodeServerMessage(buf.Next(lockTagSize + headerSize))
 		if err != nil {
 			return err
 		}
@@ -208,7 +216,7 @@ func (l *Locksmith) acquireCallback(
 	return func(err error) error {
 		if err != nil {
 			log.Error().Err(err).Msg("got error in acquire callback")
-			conn.Close()
+			_ = conn.Close()
 			return nil
 		}
 
@@ -235,7 +243,7 @@ func (l *Locksmith) releaseCallback(
 	return func(err error) error {
 		if err != nil {
 			log.Error().Err(err).Msg("got error in release callback")
-			conn.Close()
+			_ = conn.Close()
 		}
 
 		return nil

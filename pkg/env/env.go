@@ -14,6 +14,10 @@ const (
 	LOCKSMITH_LOG_OUTPUT_DEFAULT         string = "stderr"
 	LOCKSMITH_LOG_OUTPUT_CONSOLE         string = "LOCKSMITH_LOG_OUTPUT_CONSOLE"
 	LOCKSMITH_LOG_OUTPUT_CONSOLE_DEFAULT bool   = false
+	LOCKSMITH_VERSION                    string = "LOCKSMITH_VERSION"
+	LOCKSMITH_VERSION_DEFAULT            string = "unknown"
+	LOCKSMITH_COMMIT                     string = "LOCKSMITH_COMMIT"
+	LOCKSMITH_COMMIT_DEFAULT             string = "unknown"
 )
 
 const (
