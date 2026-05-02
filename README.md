@@ -13,7 +13,6 @@
 - [How to use the locksmith code as a library](#how-to-use-the-locksmith-code-as-a-library)
 - [Metrics](#metrics)
 
-
 Locksmith provides a simple way to obtain shared locks between applications.
 
 This project provides both server software, a command line utility, and a sample client. The protocol package can also be used to write custom client software.
@@ -25,7 +24,8 @@ The locksmith server can be installed in two different ways. To get the server c
 ```bash
 docker pull ghcr.io/maansthoernvik/locksmith:latest
 ```
-*You can browse available versions here: https://github.com/maansthoernvik/locksmith/pkgs/container/locksmith*
+
+*You can browse available versions here: <https://github.com/maansthoernvik/locksmith/pkgs/container/locksmith>*
 
 Run `go install` to instead get the server binary, make sure you have set either `GOPATH` or `GOBIN`.
 
@@ -44,11 +44,13 @@ go install github.com/maansthoernvik/locksmith/cmd/locksmithctl@v0.1.0
 ### The locksmith server
 
 Either...
+
 ```bash
 docker run -e LOCKSMITH_LOG_LEVEL=INFO ghcr.io/maansthoernvik/locksmith:latest
 ```
 
 Or...
+
 ```bash
 LOCKSMITH_LOG_LEVEL=INFO locksmith
 ```
@@ -150,10 +152,10 @@ Or use the protocol package directly to write your own client. See the `ClientMe
 
 Locksmith exposes a few simple Prometheus metrics:
 
- - `locksmith_total_locked_locks`: Gauge showing the number of currently locked locks.
- - `locksmith_acquires`: Counter showing the total numnber of (successful) acquires since start
- - `locksmith_releases`: Counter showing the total number of (successful) releases since start
- - `locksmith_rejections`: Counter vector showing the number of rejections due to client misbehavior. Vector labels are: `bad_manners`, `unnecessary_acquire`, and `unnecessary_release`
+- `locksmith_total_locked_locks`: Gauge showing the number of currently locked locks.
+- `locksmith_acquires`: Counter showing the total numnber of (successful) acquires since start
+- `locksmith_releases`: Counter showing the total number of (successful) releases since start
+- `locksmith_rejections`: Counter vector showing the number of rejections due to client misbehavior. Vector labels are: `bad_manners`, `unnecessary_acquire`, and `unnecessary_release`
 
 In addition to the above, locksmith also exposes all metrics provided by the `promhttp` package, providing insight into Golang performance.
 
