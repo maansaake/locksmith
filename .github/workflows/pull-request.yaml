@@ -1,0 +1,26 @@
+name: Pull request validation
+
+run-name: "Pull request validation - ${{ github.event.pull_request.number }}"
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+jobs:
+  go:
+    name: Golang
+    uses: ./.github/workflows/go.yaml
+
+  image:
+    name: Image
+    needs: go
+    uses: ./.github/workflows/image.yaml
+    with:
+      version: "latest"
+      push: false
