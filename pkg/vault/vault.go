@@ -83,7 +83,7 @@ var (
 	rejectionCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "locksmith_rejection_total",
 		Help: "The number of rejections due to bad manners and unnecessary releases/acquires",
-	}, []string{"reason"})
+	}, []string{counterReasonLabel})
 )
 
 const (
@@ -92,6 +92,8 @@ const (
 
 	LOCKED   lockState = true
 	UNLOCKED lockState = false
+
+	counterReasonLabel = "reason"
 )
 
 func New(options *Opts) Vault {
@@ -150,7 +152,7 @@ func (vault *vaultImpl) acquireAction(
 		if lock.isOwner(client) {
 			lock.unlock()
 			locksGauge.Dec()
-			rejectionCounter.With(prometheus.Labels{"reason": "unnecessary_acquire"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_acquire"}).Inc()
 
 			_ = callback(ErrUnnecessaryAcquire)
 
@@ -204,13 +206,13 @@ func (vault *vaultImpl) releaseAction(
 		// if already unlocked, kill the client for not following the protocol
 		//nolint:gocritic // why not
 		if !currentState.isLocked() {
-			rejectionCounter.With(prometheus.Labels{"reason": "unnecessary_release"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_release"}).Inc()
 
 			_ = callback(ErrUnnecessaryRelease)
 			// else, the lock is in LOCKED state, so check the owner, if
 			// client isn't the owner, it's misbehaving and needs to be killed
 		} else if !currentState.isOwner(client) {
-			rejectionCounter.With(prometheus.Labels{"reason": "bad_manners"}).Inc()
+			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "bad_manners"}).Inc()
 
 			_ = callback(ErrBadManners)
 			// else, client is the owner of the lock, release it and call
