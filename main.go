@@ -155,11 +155,17 @@ func getTlsConfig() *tls.Config {
 
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	requireClientVerify, err := env.GetOptionalBool(env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT, env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT)
+	requireClientVerify, err := env.GetOptionalBool(
+		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT,
+		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT,
+	)
 	checkError(err)
 
 	if requireClientVerify {
-		clientCaCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH, env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT)
+		clientCaCertPath, err := env.GetOptionalString(
+			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH,
+			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT,
+		)
 		checkError(err)
 
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert

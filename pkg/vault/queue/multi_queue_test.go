@@ -15,7 +15,7 @@ func Test_queueIndexDistribution(t *testing.T) {
 	numberOfTags := 1000000
 	result := map[uint16]int{}
 
-	for i := 0; i < numberOfTags; i++ {
+	for range numberOfTags {
 		tag := randSeq(50)
 		hash := mq.hashFunc(tag)
 		index := mq.queueIndexFromHash(hash)
@@ -71,7 +71,7 @@ func Test_Enqueue(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(calls)
-	for i := 0; i < calls; i++ {
+	for range calls {
 		mq.Enqueue(randSeq(20), func(slot int, lockTag string) {
 			wg.Done()
 		})
@@ -86,7 +86,7 @@ func Benchmark_queueIndex(b *testing.B) {
 	mq := &multiQueue{queues: make([]chan *queueItem, 10)}
 
 	b.Run("Standard", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			mq.queueIndexFromHash(fnv1aHash(randSeq(BENCHMARKING_SEQUENCE_SIZE)))
 		}
 	})

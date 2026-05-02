@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"slices"
@@ -98,7 +99,7 @@ func (l *Locksmith) handleConnection(conn net.Conn) {
 	for {
 		n, err := clientContext.conn.Read(read)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				log.Info().
 					Str("address", clientContext.conn.RemoteAddr().String()).
 					Msg("connection closed by remote (EOF)")

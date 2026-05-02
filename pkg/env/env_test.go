@@ -1,6 +1,7 @@
 package env
 
 import (
+	"errors"
 	"os"
 	"testing"
 )
@@ -8,17 +9,20 @@ import (
 func Test_RequiredAndOptionalVariables(t *testing.T) {
 	t.Log("Getting mandatory variables that are missing")
 	_, err := GetRequiredBool("DOES_NOT_EXIST_B")
-	if _, ok := err.(*NotFoundError); !ok {
+	notFoundError := &NotFoundError{}
+	if errors.As(err, &notFoundError) {
 		t.Fatal("Expected a not found error for the required boolean variable")
 	}
 
 	_, err = GetRequiredString("DOES_NOT_EXIST_S")
-	if _, ok := err.(*NotFoundError); !ok {
+	notFoundError = &NotFoundError{}
+	if errors.As(err, &notFoundError) {
 		t.Fatal("Expected a not found error for the required string variable")
 	}
 
 	_, err = GetRequiredInteger("DOES_NOT_EXIST_I")
-	if _, ok := err.(*NotFoundError); !ok {
+	notFoundError = &NotFoundError{}
+	if errors.As(err, &notFoundError) {
 		t.Fatal("Expected a not found error for the required integer variable")
 	}
 
@@ -49,7 +53,7 @@ func Test_RequiredAndOptionalVariables(t *testing.T) {
 	if err != nil {
 		t.Fatal("Expected integer variable not found")
 	}
-	if !(i == 100000) {
+	if i != 100000 {
 		t.Fatalf("Integer value expected to be '100000' but was %d", i)
 	}
 
@@ -65,7 +69,7 @@ func Test_RequiredAndOptionalVariables(t *testing.T) {
 	}
 
 	i, _ = GetOptionalInteger("OPTIONAL_I", 8000)
-	if !(i == 8000) {
+	if i != 8000 {
 		t.Fatalf("Expected integer to use default of '8000', but was %d", i)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -36,7 +37,7 @@ func Test_ClientLifecycle(t *testing.T) {
 				buffer := make([]byte, 100)
 				_, err = conn.Read(buffer)
 				t.Log("Read from client connection")
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					t.Log("Client closed connection")
 					wg.Done()
 					return
@@ -78,7 +79,7 @@ func Test_ClientAcquireRelease(t *testing.T) {
 				buffer := make([]byte, 100)
 				n, err := conn.Read(buffer)
 				t.Log("Read from client connection")
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					t.Log("Client closed connection")
 					return
 				}
@@ -89,10 +90,11 @@ func Test_ClientAcquireRelease(t *testing.T) {
 					return
 				}
 
-				if serverMessage.Type == protocol.Acquire {
+				switch serverMessage.Type {
+				case protocol.Acquire:
 					t.Log("Acquire received")
 					wg.Done()
-				} else if serverMessage.Type == protocol.Release {
+				case protocol.Release:
 					t.Log("Release received")
 					wg.Done()
 				}
@@ -138,7 +140,7 @@ func Test_ClientOnAcquired(t *testing.T) {
 				buffer := make([]byte, 100)
 				n, err := conn.Read(buffer)
 				t.Log("Read from client connection")
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					t.Log("Client closed connection")
 					return
 				}
@@ -232,7 +234,6 @@ func Test_MutualTls(t *testing.T) {
 					wg.Done()
 				}
 
-				//nolint
 				conn.Write(protocol.EncodeClientMessage(
 					&protocol.ClientMessage{
 						Type:    protocol.Acquired,

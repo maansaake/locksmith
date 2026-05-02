@@ -83,7 +83,7 @@ func EncodeServerMessage(serverMessage *ServerMessage) []byte {
 	bytes := make([]byte, 2+len(serverMessage.LockTag))
 	bytes[0] = byte(serverMessage.Type)
 	bytes[1] = byte(len(serverMessage.LockTag))
-	for i := 0; i < len(serverMessage.LockTag); i++ {
+	for i := range len(serverMessage.LockTag) {
 		bytes[i+2] = byte(serverMessage.LockTag[i])
 	}
 	return bytes
@@ -137,7 +137,7 @@ func EncodeClientMessage(clientMessage *ClientMessage) []byte {
 	log.Debug().
 		Str("tag", clientMessage.LockTag).
 		Msg("encoding lock tag")
-	for i := 0; i < len(clientMessage.LockTag); i++ {
+	for i := range len(clientMessage.LockTag) {
 		bytes[i+2] = byte(clientMessage.LockTag[i])
 	}
 	log.Debug().

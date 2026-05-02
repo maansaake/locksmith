@@ -106,7 +106,7 @@ func TestTcpAcceptor_ClientEvictedNoTls(t *testing.T) {
 	}
 	defer c.Close()
 
-	c.Acquire("abc") //nolint
+	c.Acquire("abc")
 	t.Log("Awaiting listener read...")
 	wg.Wait()
 }
@@ -173,7 +173,7 @@ func TestTcpAcceptor_MutualTls(t *testing.T) {
 	}
 	defer c.Close()
 
-	c.Acquire("abc") //nolint
+	c.Acquire("abc")
 	t.Log("Awaiting listener read...")
 	wg.Wait()
 }

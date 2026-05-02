@@ -19,7 +19,7 @@ func Test_SingleQueueTimeTaken(t *testing.T) {
 	wg.Add(numEnqueues)
 
 	t.Log("Starting to Enqueue", numEnqueues, "items at", time.Now())
-	for i := 0; i < numEnqueues; i++ {
+	for range numEnqueues {
 		sq.Enqueue(randSeq(50), func(slot int, lockTag string) {
 			time.Sleep(1 * time.Millisecond)
 			wg.Done()
@@ -40,7 +40,7 @@ func Test_Single_Enqueue(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(expectedCallCount)
 
-	for i := 0; i < expectedCallCount; i++ {
+	for range expectedCallCount {
 		q.Enqueue("lt", func(slot int, lockTag string) {
 			wg.Done()
 		})

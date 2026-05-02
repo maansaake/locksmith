@@ -43,7 +43,12 @@ func main() {
 	flag.UintVar(&port, "port", 9000, "Locksmith port number.")
 	flag.StringVar(&clientCertPath, "cert", "", "Absolute path to a PEM encoded certificate.")
 	flag.StringVar(&clientPrivateKeyPath, "private-key", "", "Absolute path to a PEM encoded private key.")
-	flag.StringVar(&caCertPath, "ca-cert", "", "Absolute path to a PEM encoded CA certificate which signed the server certificate.")
+	flag.StringVar(
+		&caCertPath,
+		"ca-cert",
+		"",
+		"Absolute path to a PEM encoded CA certificate which signed the server certificate.",
+	)
 
 	flag.Usage = func() {
 		fmt.Println(USAGE)

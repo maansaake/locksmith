@@ -23,7 +23,6 @@ jobs:
     uses: ./.github/workflows/callable-test-unit.yaml
 
   image:
-    name: Image
     uses: ./.github/workflows/image.yaml
     with:
       push: false

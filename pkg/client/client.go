@@ -4,9 +4,10 @@ package client
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
+	"errors"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/maansaake/locksmith/pkg/protocol"
 	"github.com/rs/zerolog/log"
@@ -53,7 +54,7 @@ func New(options *Opts) Client {
 // error, even if something is wrong, until the first client write is issues. This is
 // because of how TLS 13 is implemented.
 func (c *clientImpl) Connect() (err error) {
-	address := fmt.Sprintf("%s:%d", c.host, c.port)
+	address := net.JoinHostPort(c.host, strconv.FormatUint(uint64(c.port), 10))
 	if c.tlsConfig != nil {
 		log.Info().
 			Str("address", address).
@@ -87,7 +88,7 @@ func (c *clientImpl) handleConnection() {
 	for {
 		n, err := c.conn.Read(read)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				log.Info().
 					Str("address", c.conn.RemoteAddr().String()).
 					Msg("connection closed by remote (EOF)")

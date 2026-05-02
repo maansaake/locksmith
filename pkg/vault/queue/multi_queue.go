@@ -39,7 +39,7 @@ func NewMultiQueue(
 	}
 
 	// Initialize queues, queue[0] is responsible for the range 0 -> 65535 / numQueues and so on
-	for i := 0; i < concurrency; i++ {
+	for i := range concurrency {
 		ql.queues[i] = make(chan *queueItem, capacity)
 
 		go func(i int, queue chan *queueItem) {

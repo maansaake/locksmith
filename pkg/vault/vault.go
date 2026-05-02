@@ -298,7 +298,7 @@ func newlock() *lock {
 	return &lock{owner: "", state: UNLOCKED}
 }
 
-// implies lock is in LOCKED state
+// implies lock is in LOCKED state.
 func (l *lock) isOwner(client string) bool {
 	return l.owner == client
 }

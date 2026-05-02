@@ -26,6 +26,7 @@ jobs:
           # Exclude _test files, they are not needed to build the code and they change more often than the actual code. 
           find . -type f -name "*.go" ! -name "*_test.go" -exec sha256sum {} \; > gosum.txt
           sha256sum modsum.txt gosum.txt > totalmodsum.txt
+          sha256sum totalmodsum.txt > totalmodsum.txt
           echo "checksum=$(cat totalmodsum.txt | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       # Use restore-keys to always use a cache that was created with the same
