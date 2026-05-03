@@ -2,6 +2,8 @@
 
 [![Main branch protection](https://github.com/maansaake/locksmith/actions/workflows/main.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/main.yaml)
 [![Code scanning](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml/badge.svg)](https://github.com/maansaake/locksmith/actions/workflows/code-scanning.yaml)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/maansaake/locksmith)](https://goreportcard.com/report/github.com/maansaake/locksmith)
 ![tag](https://img.shields.io/github/v/tag/maansaake/locksmith?label=latest%20version)
 
 - [Install](#install)
