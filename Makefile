@@ -11,3 +11,6 @@ lint:
 
 unit-test:
 	go test ./... -failfast
+
+vulncheck:
+	cd tools/govulncheck && go tool govulncheck -C ../.. ./...
