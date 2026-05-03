@@ -11,3 +11,6 @@ lint:
 
 unit-test:
 	go test ./... -failfast
+
+govulncheck:
+	go tool -modfile tools/go.mod govulncheck ./...
