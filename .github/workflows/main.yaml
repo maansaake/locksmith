@@ -14,13 +14,15 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/callable-build.yaml
+    secrets: inherit
 
   unit-test:
     uses: ./.github/workflows/callable-test-unit.yaml
+    secrets: inherit
 
   image:
-    name: Image
     uses: ./.github/workflows/image.yaml
+    secrets: inherit
     with:
       push: true
 
