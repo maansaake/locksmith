@@ -25,7 +25,7 @@ unit-test:
 	go test ./internal/... -failfast
 
 integration-test:
-	go test ./test/integration/... -failfast -count=1
+	go test ./test/integration/... -failfast -count=1 -v
 
 compose:
 	LOCKSMITH_PORT=${LOCKSMITH_PORT} \

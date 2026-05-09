@@ -13,6 +13,7 @@ import (
 var (
 	locksmithHost = "localhost"
 	locksmithPort = uint16(9000)
+	metricsPort   = uint16(9464)
 )
 
 const readyTimeout = 15 * time.Second

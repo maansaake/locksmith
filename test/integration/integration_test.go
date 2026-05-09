@@ -20,6 +20,11 @@ func TestMain(m *testing.M) {
 			locksmithPort = uint16(port) //nolint:gosec // validated range
 		}
 	}
+	if mp := os.Getenv("LOCKSMITH_METRICS_PORT"); mp != "" {
+		if port, err := strconv.ParseUint(mp, 10, 16); err == nil {
+			metricsPort = uint16(port) //nolint:gosec // validated range
+		}
+	}
 
 	zerologr.Set(zerologr.New(&zerologr.Opts{Caller: true, Console: true, V: 0}))
 

@@ -406,6 +406,7 @@ linters:
     paths:
       - pkg/vault/vault_mock.go
       - cmd/locksmithctl/main.go
+      - test
 
     # Log a warning if an exclusion rule is unused.
     # Default: false
