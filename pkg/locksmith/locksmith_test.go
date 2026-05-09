@@ -31,7 +31,7 @@ func TestClientContext_addRemove(t *testing.T) {
 
 func TestServer_Stop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	locksmith := New(&Opts{Port: 30001})
+	locksmith, _ := New(&Opts{Port: 30001})
 
 	go func() {
 		cancel()
@@ -47,7 +47,7 @@ func TestServer_Stop(t *testing.T) {
 
 func TestServer_handleClient(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	locksmith := New(&Opts{
+	locksmith, _ := New(&Opts{
 		Port:          30001,
 		QueueType:     vault.Single,
 		QueueCapacity: 1,

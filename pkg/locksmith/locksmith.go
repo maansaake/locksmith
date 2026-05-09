@@ -24,6 +24,9 @@ type (
 	}
 	// Opts exposes the possible options to pass to a new Locksmith instance.
 	Opts struct {
+		// Used for telemetry.
+		Version string
+
 		// Port denotes the port which will listen for incoming connections.
 		Port uint16
 
@@ -47,21 +50,25 @@ type (
 )
 
 // New creates a new Locksmith instance with the provided options.
-func New(options *Opts) *Locksmith {
-	locksmith := &Locksmith{
-		vault: vault.New(&vault.Opts{
-			QueueType:        options.QueueType,
-			QueueConcurrency: options.QueueConcurrency,
-			QueueCapacity:    options.QueueCapacity,
-		}),
+func New(opts *Opts) (*Locksmith, error) {
+	vault, err := vault.New(&vault.Opts{
+		Version:          opts.Version,
+		QueueType:        opts.QueueType,
+		QueueConcurrency: opts.QueueConcurrency,
+		QueueCapacity:    opts.QueueCapacity,
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	locksmith := &Locksmith{vault: vault}
 	locksmith.tcpAcceptor = connection.NewTCPAcceptor(&connection.TCPAcceptorOptions{
 		Handler:   locksmith.handleConnection,
-		Port:      options.Port,
-		TLSConfig: options.TLSConfig,
+		Port:      opts.Port,
+		TLSConfig: opts.TLSConfig,
 	})
 
-	return locksmith
+	return locksmith, nil
 }
 
 // Start the Locksmith instance. This is a blocking call that can be unblocked

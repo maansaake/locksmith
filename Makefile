@@ -1,3 +1,7 @@
+LOCKSMITH_PORT ?= 9000
+LOCKSMITH_METRICS_PORT ?= 9464
+LOCKSMITH_OBSERVABILITY ?= true
+
 .PHONY: build
 build:
 	mkdir -p build
@@ -17,15 +21,41 @@ govulncheck:
 	go tool -modfile tools/go.mod govulncheck ./...
 
 unit-test:
-	go test ./... -failfast
+	go test ./pkg/... -failfast
+	go test ./internal/... -failfast
 
 integration-test:
-	go test ./test/integration/...
+	go test ./test/integration/... -failfast -count=1
+
+compose:
+	LOCKSMITH_PORT=${LOCKSMITH_PORT} \
+		docker compose \
+		-f test/compose/compose.yaml \
+		up \
+		-d
+
+compose-down:
+	docker compose \
+		-f test/compose/compose.yaml \
+		down
+
+compose-logs:
+	docker compose -f test/compose/compose.yaml logs
+
+compose-logs-f:
+	docker compose -f test/compose/compose.yaml logs -f
 
 run: build
-	./build/locksmith
+	LOCKSMITH_PORT=${LOCKSMITH_PORT} \
+		LOCKSMITH_OBSERVABILITY=${LOCKSMITH_OBSERVABILITY} \
+		OTEL_METRICS_EXPORTER=prometheus \
+    OTEL_EXPORTER_PROMETHEUS_HOST=localhost \
+    OTEL_EXPORTER_PROMETHEUS_PORT=${LOCKSMITH_METRICS_PORT} \
+		./build/locksmith
 
 run-docker: build-image
-	docker run \
-		-p 8080:8080 \
+	docker run -d \
+		-p ${LOCKSMITH_PORT}:${LOCKSMITH_PORT} \
+		-e LOCKSMITH_PORT=${LOCKSMITH_PORT} \
+		--name locksmith \
 		github.com/maansaake/locksmith:local

@@ -41,6 +41,7 @@ func main() {
 	defer cleanup(context.Background()) //nolint:errcheck // impossible to handle
 
 	locksmithOptions := &locksmith.Opts{
+		Version:          env.Version.Value(),
 		Port:             uint16(env.Port.Value()), //nolint:gosec // validated on parse
 		QueueType:        vault.QueueType(env.QueueType.Value()),
 		QueueConcurrency: env.QueueConcurrency.Value(),
@@ -65,7 +66,14 @@ func main() {
 		"queue_concurrency", locksmithOptions.QueueConcurrency,
 		"queue_capacity", locksmithOptions.QueueCapacity,
 	)
-	if err := locksmith.New(locksmithOptions).Start(signalCtx); err != nil { //nolint:govet // shad
+
+	ls, err := locksmith.New(locksmithOptions)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating Locksmith instance: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := ls.Start(signalCtx); err != nil { //nolint:govet // shad
 		fmt.Fprintf(os.Stderr, "Locksmith start error: %v\n", err)
 		os.Exit(1)
 	}

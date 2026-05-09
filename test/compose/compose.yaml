@@ -1,0 +1,27 @@
+services:
+  locksmith:
+    image: ghcr.io/maansaake/locksmith:${VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - ${LOCKSMITH_PORT:-9000}:${LOCKSMITH_PORT:-9000}
+      - ${LOCKSMITH_METRICS_PORT:-9464}:${LOCKSMITH_METRICS_PORT:-9464}
+    environment:
+      - VERSION=${VERSION:-local}
+      - LOCKSMITH_PORT=${LOCKSMITH_PORT:-9000}
+      - LOCKSMITH_LOG_OUTPUT=console
+      - LOCKSMITH_LOG_VERBOSITY=0
+      - LOCKSMITH_OBSERVABILITY=${LOCKSMITH_OBSERVABILITY:-true}
+      - LOCKSMITH_RUNTIME_METRICS=${LOCKSMITH_RUNTIME_METRICS:-true}
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_HOST=locksmith
+      - OTEL_EXPORTER_PROMETHEUS_PORT=${LOCKSMITH_METRICS_PORT:-9464}
+
+  prometheus:
+    image: prom/prometheus:v3.3.1
+    pull_policy: if_not_present
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml

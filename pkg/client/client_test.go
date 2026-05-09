@@ -266,7 +266,7 @@ func Test_MutualTls(t *testing.T) {
 			RootCAs:      pool,
 			MinVersion:   tls.VersionTLS13,
 		},
-		stop: make(chan interface{}),
+		stopped: false,
 	}
 	t.Log("Connecting client")
 	err = c.Connect()

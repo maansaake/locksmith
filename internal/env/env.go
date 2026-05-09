@@ -19,10 +19,10 @@ const (
 	defaultVersion = "unknown"
 	defaultCommit  = "unknown"
 
-	defaultMetrics = false
+	defaultObservability  = false
+	defaultRuntimeMetrics = true
 
-	defaultPort        = 9000
-	defaultMetricsPort = 20000
+	defaultPort = 9000
 
 	defaultQueueType        = "multi"
 	defaultQueueConcurrency = 10
@@ -72,12 +72,12 @@ var (
 	ObservabilityEnabled = envparser.Register(&envparser.Opts[bool]{
 		Name:  "OBSERVABILITY",
 		Desc:  "Whether to enable Prometheus metrics. If true, a /metrics endpoint will be exposed on the server.",
-		Value: defaultMetrics,
+		Value: defaultObservability,
 	})
 	RuntimeMetrics = envparser.Register(&envparser.Opts[bool]{
 		Name:  "RUNTIME_METRICS",
 		Desc:  "Whether to enable Go runtime metrics. This is only applicable if OBSERVABILITY is set to true.",
-		Value: defaultMetrics,
+		Value: defaultRuntimeMetrics,
 	})
 
 	Port = envparser.Register(&envparser.Opts[int]{

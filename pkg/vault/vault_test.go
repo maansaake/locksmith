@@ -13,7 +13,7 @@ func (t *tql) Enqueue(locktag string, action func(int, string)) {
 }
 
 func Test_Acquire(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
+	vault, _ := New(&Opts{QueueType: Single})
 	v := vault.(*vaultImpl)
 	v.queueLayer = &tql{}
 	wg := sync.WaitGroup{}
@@ -38,7 +38,7 @@ func Test_Acquire(t *testing.T) {
 }
 
 func Test_Release(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
+	vault, _ := New(&Opts{QueueType: Single})
 	v := vault.(*vaultImpl)
 	v.queueLayer = &tql{}
 	wg := sync.WaitGroup{}
@@ -244,7 +244,7 @@ func TestVault_Cleanup(t *testing.T) {
 }
 
 func TestVault_CleanupWaitlist(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
+	vault, _ := New(&Opts{QueueType: Single})
 	v := vault.(*vaultImpl)
 	v.queueLayer = &tql{}
 

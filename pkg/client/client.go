@@ -35,7 +35,9 @@ type (
 		tlsConfig  *tls.Config
 		onAcquired func(lockTag string)
 		conn       net.Conn
-		stop       chan interface{}
+
+		running bool
+		stopped bool
 	}
 )
 
@@ -45,7 +47,9 @@ func New(options *Opts) Client {
 		port:       options.Port,
 		tlsConfig:  options.TLSConfig,
 		onAcquired: options.OnAcquired,
-		stop:       make(chan interface{}),
+
+		running: false,
+		stopped: false,
 	}
 }
 
@@ -54,6 +58,11 @@ func New(options *Opts) Client {
 // error, even if something is wrong, until the first client write is issues. This is
 // because of how TLS 13 is implemented.
 func (c *clientImpl) Connect() error {
+	if c.running {
+		zerologr.Info("Client already running, skipping Connect()")
+		return nil
+	}
+
 	var err error
 	address := net.JoinHostPort(c.host, strconv.FormatUint(uint64(c.port), 10))
 	if c.tlsConfig != nil {
@@ -70,10 +79,13 @@ func (c *clientImpl) Connect() error {
 		c.conn, err = net.Dial("tcp", address)
 	}
 	if err != nil {
+		zerologr.Error(err, "Failed to connect to server", "address", address)
 		return err
 	}
 	zerologr.Info("Connected")
 
+	c.running = true
+	c.stopped = false
 	go c.handleConnection()
 
 	return nil
@@ -88,14 +100,13 @@ func (c *clientImpl) handleConnection() {
 	buf := &bytes.Buffer{}
 	for {
 		n, err := c.conn.Read(read)
-		if err != nil {
+		if err != nil { //nolint:nestif // it is what it is
 			if errors.Is(err, io.EOF) {
 				zerologr.Info("Connection closed by remote (EOF)", "address", c.conn.RemoteAddr().String())
 			} else {
-				select {
-				case <-c.stop:
+				if c.stopped {
 					zerologr.Info("Stopping client connection gracefully")
-				default:
+				} else {
 					zerologr.Error(err, "Connection read error")
 				}
 			}
@@ -114,6 +125,8 @@ func (c *clientImpl) handleConnection() {
 			break
 		}
 	}
+
+	c.running = false
 }
 
 func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
@@ -164,9 +177,9 @@ func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
 	}
 }
 
-// Close disconnects from the Locksmith instance.
+// Close disconnects from the Locksmith instance. Safe to call multiple times.
 func (c *clientImpl) Close() {
-	close(c.stop)
+	c.stopped = true
 	_ = c.conn.Close()
 }
 

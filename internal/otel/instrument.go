@@ -8,10 +8,8 @@ import (
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
@@ -43,25 +41,12 @@ func Instrument(
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
-	// Set up propagator.
-	prop := newPropagator()
-	otel.SetTextMapPropagator(prop)
-
 	// Create telemetry resource.
 	res := resource.NewWithAttributes(
 		semconv.SchemaURL,
 		semconv.ServiceName(serviceName),
 		semconv.ServiceVersion(serviceVersion),
 	)
-
-	// Set up trace provider.
-	tracerProvider, err := newTracerProvider(ctx, res)
-	if err != nil {
-		handleErr(err)
-		return shutdown, err
-	}
-	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
-	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
 	meterProvider, err := newMeterProvider(ctx, res)
@@ -90,29 +75,6 @@ func Instrument(
 	}
 
 	return shutdown, err
-}
-
-func newPropagator() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-}
-
-func newTracerProvider(ctx context.Context, res *resource.Resource) (*trace.TracerProvider, error) {
-	traceExporter, err := autoexport.NewSpanExporter(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// NOTE: make sure to configure a sampler in production. The default is AlwaysSample unless otherwise stated by the parent span.
-	// This is appropriate for development and testing, but can lead to high load in production settings.
-	// OTEL_TRACES_SAMPLER=parentbased_traceidratio
-	// OTEL_TRACES_SAMPLER_ARG=0.1
-	return trace.NewTracerProvider(
-		trace.WithBatcher(traceExporter),
-		trace.WithResource(res),
-	), nil
 }
 
 func newMeterProvider(ctx context.Context, res *resource.Resource) (*metric.MeterProvider, error) {
