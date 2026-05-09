@@ -56,7 +56,7 @@ type (
 		queueLayer queue.Layer
 		waitList   map[string][]*func(slot int, lockTag string)
 
-		lockGauge        metric.Int64Gauge
+		lockGauge        metric.Int64UpDownCounter
 		acquireCounter   metric.Int64Counter
 		releaseCounter   metric.Int64Counter
 		rejectionCounter metric.Int64Counter
@@ -94,14 +94,14 @@ func New(opts *Opts) (Vault, error) {
 		"github.com/maansaake/locksmith/pkg/vault", metric.WithInstrumentationVersion(opts.Version),
 	)
 
-	locksGauge, err := m.Int64Gauge(
+	lockGauge, err := m.Int64UpDownCounter(
 		"locksmith.locks",
 		metric.WithDescription("Number of held locks"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating locks gauge: %w", err)
 	}
-	vault.lockGauge = locksGauge
+	vault.lockGauge = lockGauge
 
 	acquireCounter, err := m.Int64Counter(
 		"locksmith.acquires",
@@ -180,7 +180,7 @@ func (vault *vaultImpl) acquireAction(
 		//nolint:gocritic // why not
 		if lock.isOwner(client) {
 			lock.unlock()
-			vault.lockGauge.Record(context.TODO(), -1)
+			vault.lockGauge.Add(context.TODO(), -1)
 			vault.rejectionCounter.Add(
 				context.TODO(),
 				1,
@@ -204,7 +204,7 @@ func (vault *vaultImpl) acquireAction(
 				vault.popWaitlist(slot, lockTag)
 			} else {
 				lock.lock(client)
-				vault.lockGauge.Record(context.TODO(), 1)
+				vault.lockGauge.Add(context.TODO(), 1)
 				vault.acquireCounter.Add(context.TODO(), 1)
 			}
 		}
@@ -257,7 +257,7 @@ func (vault *vaultImpl) releaseAction(
 			// callback
 		} else {
 			currentState.unlock()
-			vault.lockGauge.Record(context.TODO(), -1)
+			vault.lockGauge.Add(context.TODO(), -1)
 			vault.releaseCounter.Add(context.TODO(), 1)
 
 			_ = callback(nil) // We don't care about release errors
@@ -284,7 +284,7 @@ func (vault *vaultImpl) cleanupAction(client string) func(int, string) {
 		zerologr.V(50).Info("Cleanup", "tag", lockTag, "client", client, "slot", slot)
 		if currentState := vault.fetch(slot, lockTag); currentState.isOwner(client) {
 			currentState.unlock()
-			vault.lockGauge.Record(context.TODO(), -1)
+			vault.lockGauge.Add(context.TODO(), -1)
 			vault.releaseCounter.Add(context.TODO(), 1)
 
 			vault.popWaitlist(slot, lockTag)
