@@ -27,6 +27,10 @@ unit-test:
 integration-test:
 	go test ./test/integration/... -failfast -count=1 -v
 
+integration-test-json:
+	mkdir -p build
+	go test ./test/integration/... -failfast -count=1 -v -json > build/integration-test-output.json
+
 compose:
 	LOCKSMITH_PORT=${LOCKSMITH_PORT} \
 		docker compose \

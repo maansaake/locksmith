@@ -22,4 +22,9 @@ jobs:
     name: Image
     uses: ./.github/workflows/image.yaml
     with:
-      push: false
+      push: true
+
+  integration-test:
+    needs: image
+    uses: ./.github/workflows/callable-test-integration.yaml
+    secrets: inherit

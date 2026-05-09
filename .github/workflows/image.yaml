@@ -9,7 +9,7 @@ on:
         description: "Version to tag the image with"
         required: false
         type: string
-        default: "latest"
+        default: "unstable"
       push:
         description: "Whether to push the image to the registry"
         required: false
