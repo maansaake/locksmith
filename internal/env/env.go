@@ -158,8 +158,8 @@ var (
 
 //nolint:gochecknoinits // intended
 func init() {
-	envparser.ExitOnError = false   //nolint:reassign // intended
-	envparser.Prefix = "LOCKSMITH_" //nolint:reassign // intended
+	envparser.ExitOnError = false  //nolint:reassign // intended
+	envparser.Prefix = "LOCKSMITH" //nolint:reassign // intended
 }
 
 func Parse() error {
