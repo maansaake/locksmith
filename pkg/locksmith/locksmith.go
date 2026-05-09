@@ -14,6 +14,7 @@ import (
 	"github.com/maansaake/locksmith/pkg/protocol"
 	"github.com/maansaake/locksmith/pkg/vault"
 	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 type (
@@ -69,16 +70,15 @@ func New(options *Opts) *Locksmith {
 func (l *Locksmith) Start(ctx context.Context) error {
 	err := l.tcpAcceptor.Start()
 	if err != nil {
-		log.Error().Msg("failed to start TCP acceptor")
 		return err
 	}
-	log.Info().Msg("started locksmith")
+	zerologr.Info("Started locksmith")
 
 	<-ctx.Done()
-	log.Info().Msg("stopping locksmith")
+	zerologr.Info("Stopping locksmith")
 	l.tcpAcceptor.Stop()
 
-	return err
+	return nil
 }
 
 // Handler for connections accepted by the TCP acceptor. This function contains
