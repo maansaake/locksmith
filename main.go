@@ -57,6 +57,14 @@ func main() {
 		locksmithOptions.TLSConfig = tlsConfig
 	}
 
+	zerologr.Info(
+		"Starting locksmith",
+		"port", locksmithOptions.Port,
+		"tls_enabled", locksmithOptions.TLSConfig != nil,
+		"queue_type", locksmithOptions.QueueType,
+		"queue_concurrency", locksmithOptions.QueueConcurrency,
+		"queue_capacity", locksmithOptions.QueueCapacity,
+	)
 	if err := locksmith.New(locksmithOptions).Start(signalCtx); err != nil { //nolint:govet // shad
 		fmt.Fprintf(os.Stderr, "Locksmith start error: %v\n", err)
 		os.Exit(1)

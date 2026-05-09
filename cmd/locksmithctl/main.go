@@ -15,8 +15,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/go-logr/logr"
 	"github.com/maansaake/locksmith/pkg/client"
-	"github.com/rs/zerolog"
+	"github.com/trebent/zerologr"
 )
 
 const USAGE = `Starts a session towards a Locksmith instance using the sample Locksmith
@@ -39,7 +40,7 @@ var (
 
 func main() {
 	// Disables logging globally
-	zerolog.SetGlobalLevel(zerolog.NoLevel)
+	zerologr.Set(logr.Discard())
 
 	flag.StringVar(&host, "host", "localhost", "Locksmith hostname or IP address.")
 	flag.UintVar(&port, "port", 9000, "Locksmith port number.")

@@ -1,3 +1,4 @@
+.PHONY: build
 build:
 	mkdir -p build
 	go build -o build/locksmith
@@ -17,3 +18,6 @@ unit-test:
 
 govulncheck:
 	go tool -modfile tools/go.mod govulncheck ./...
+
+run: build
+	./build/locksmith

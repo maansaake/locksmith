@@ -3,7 +3,7 @@ package queue
 import (
 	"math"
 
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 // An implementation of the QueueLayer interface utilizaing multiple channels
@@ -43,7 +43,7 @@ func NewMultiQueue(
 		ql.queues[i] = make(chan *item, capacity)
 
 		go func(i int, queue chan *item) {
-			log.Info().Int("number", i).Msg("starting multi queue go routine")
+			zerologr.Info("Starting multi queue go routine", "number", i)
 			for {
 				qi := <-queue
 				qi.action(i, qi.lockTag)
@@ -58,13 +58,10 @@ func NewMultiQueue(
 // a hold of a synchronization Go-routine specific to the resulting hash of the
 // lock tag.
 func (multiQueue *multiQueue) Enqueue(lockTag string, action func(int, string)) {
-	log.Debug().Str("tag", lockTag).Msg("generating hash and fetching queue index")
+	zerologr.V(50).Info("Generating hash and fetching queue index", "tag", lockTag)
 	hash := multiQueue.hashFunc(lockTag)
 	queueIndex := multiQueue.queueIndexFromHash(hash)
-	log.Debug().
-		Uint16("hash", hash).
-		Int("queue-index", int(queueIndex)).
-		Msg("enqueueing")
+	zerologr.V(50).Info("Enqueueing", "hash", hash, "queue-index", int(queueIndex))
 	multiQueue.queues[queueIndex] <- &item{lockTag: lockTag, action: action}
 }
 

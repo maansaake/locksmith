@@ -8,7 +8,7 @@ import (
 	"github.com/maansaake/locksmith/pkg/vault/queue"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 type (
@@ -125,10 +125,7 @@ func (vault *vaultImpl) Acquire(
 	client string,
 	callback func(error) error,
 ) {
-	log.Info().
-		Str("client", client).
-		Str("tag", lockTag).
-		Msg("acquiring")
+	zerologr.Info("Acquiring", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(
 		lockTag, vault.acquireAction(client, callback),
 	)
@@ -144,7 +141,7 @@ func (vault *vaultImpl) acquireAction(
 	callback func(error) error,
 ) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("acquire")
+		zerologr.V(50).Info("Acquire", "tag", lockTag, "client", client, "slot", slot)
 		lock := vault.fetch(slot, lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
@@ -185,10 +182,7 @@ func (vault *vaultImpl) Release(
 	client string,
 	callback func(error) error,
 ) {
-	log.Info().
-		Str("client", client).
-		Str("tag", lockTag).
-		Msg("releasing")
+	zerologr.Info("Releasing", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(lockTag, vault.releaseAction(client, callback))
 }
 
@@ -201,7 +195,7 @@ func (vault *vaultImpl) releaseAction(
 	callback func(error) error,
 ) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("release")
+		zerologr.V(50).Info("Release", "tag", lockTag, "client", client, "slot", slot)
 		currentState := vault.fetch(slot, lockTag)
 		// if already unlocked, kill the client for not following the protocol
 		//nolint:gocritic // why not
@@ -231,7 +225,7 @@ func (vault *vaultImpl) releaseAction(
 
 // Cleans up a locktag associated with a given client.
 func (vault *vaultImpl) Cleanup(lockTag, client string) {
-	log.Info().Str("client", client).Str("tag", lockTag).Msg("cleaning up")
+	zerologr.Info("Cleaning up", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(
 		lockTag, vault.cleanupAction(client),
 	)
@@ -243,7 +237,7 @@ func (vault *vaultImpl) Cleanup(lockTag, client string) {
 // handles the vault's lock states.
 func (vault *vaultImpl) cleanupAction(client string) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("cleanup")
+		zerologr.V(50).Info("Cleanup", "tag", lockTag, "client", client, "slot", slot)
 		if currentState := vault.fetch(slot, lockTag); currentState.isOwner(client) {
 			currentState.unlock()
 			locksGauge.Dec()
@@ -268,21 +262,21 @@ func (vault *vaultImpl) fetch(slot int, lockTag string) *lock {
 // Waitlist the input action, related to the given lock tag. Appends the action
 // to the back of the waitlist of the lock tag.
 func (vault *vaultImpl) waitlist(lockTag string, callback func(int, string)) {
-	log.Debug().Str("tag", lockTag).Msg("waitlisting")
+	zerologr.V(50).Info("Waitlisting", "tag", lockTag)
 	_, ok := vault.waitList[lockTag]
 	if !ok {
 		vault.waitList[lockTag] = []*func(int, string){&callback}
 	} else {
 		vault.waitList[lockTag] = append(vault.waitList[lockTag], &callback)
 	}
-	log.Debug().Str("tag", lockTag).Int("waitlisted", len(vault.waitList[lockTag])).Send()
+	zerologr.V(50).Info("", "tag", lockTag, "waitlisted", len(vault.waitList[lockTag]))
 }
 
 // IMPORTANT: only call from synchronized Go-routines.
 // Pop from the waitlist belonging to the input lock tag, results in a waitlisted
 // action being called directly.
 func (vault *vaultImpl) popWaitlist(slot int, lockTag string) {
-	log.Debug().Str("tag", lockTag).Msg("popping from waitlist")
+	zerologr.V(50).Info("Popping from waitlist", "tag", lockTag)
 	if wl, ok := vault.waitList[lockTag]; ok && len(wl) > 0 {
 		first := wl[0]
 
@@ -291,12 +285,12 @@ func (vault *vaultImpl) popWaitlist(slot int, lockTag string) {
 		} else {
 			vault.waitList[lockTag] = wl[1:]
 		}
-		log.Debug().Str("tag", lockTag).Interface("waitlisted", len(wl)-1).Send()
+		zerologr.V(50).Info("", "tag", lockTag, "waitlisted", len(wl)-1)
 
 		f := *first
 		f(slot, lockTag)
 	} else {
-		log.Debug().Msg("no waitlisted clients found")
+		zerologr.V(50).Info("No waitlisted clients found")
 	}
 }
 

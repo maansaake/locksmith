@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 type TCPAcceptor interface {
@@ -45,10 +45,10 @@ func (tcpAcceptor *tcpAcceptorImpl) Start() error {
 	if tcpAcceptor.tlsConfig == nil {
 		//nolint:noctx // TODO: fix
 		tcpAcceptor.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", tcpAcceptor.port))
-		log.Info().Uint16("port", tcpAcceptor.port).Msg("starting listener")
+		zerologr.Info("Starting listener", "port", tcpAcceptor.port)
 	} else {
 		tcpAcceptor.listener, err = tls.Listen("tcp", fmt.Sprintf(":%d", tcpAcceptor.port), tcpAcceptor.tlsConfig)
-		log.Info().Uint16("port", tcpAcceptor.port).Msg("starting TLS listener on port")
+		zerologr.Info("Starting TLS listener on port", "port", tcpAcceptor.port)
 	}
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (tcpAcceptor *tcpAcceptorImpl) Start() error {
 
 // Stop the TCP acceptor gracefully.
 func (tcpAcceptor *tcpAcceptorImpl) Stop() {
-	log.Info().Msg("stopping TCP acceptor")
+	zerologr.Info("Stopping TCP acceptor")
 	close(tcpAcceptor.stop)
 	_ = tcpAcceptor.listener.Close()
 }
@@ -75,15 +75,13 @@ func (tcpAcceptor *tcpAcceptorImpl) startListener() {
 		if err != nil {
 			select {
 			case <-tcpAcceptor.stop:
-				log.Info().Msg("stopping accept loop gracefully")
+				zerologr.Info("Stopping accept loop gracefully")
 			default:
-				log.Error().Err(err).Msg("a non stop related error occurred")
+				zerologr.Error(err, "A non stop related error occurred")
 			}
 			break
 		}
-		log.Debug().
-			Str("address", conn.RemoteAddr().String()).
-			Msg("listener accepted connection")
+		zerologr.V(50).Info("Listener accepted connection", "address", conn.RemoteAddr().String())
 
 		go func() {
 			defer conn.Close()

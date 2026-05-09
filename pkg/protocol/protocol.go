@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 // ServerMessageType encompasses all messages: Client -> Locksmith.
@@ -54,23 +54,21 @@ type ClientMessage struct {
 //   - The server message type is not recognized.
 //   - The lock tag is not valid UTF8.
 func DecodeServerMessage(bytes []byte) (*ServerMessage, error) {
-	log.Debug().
-		Bytes("bytes", bytes).
-		Msg("decoding server message")
+	zerologr.V(50).Info("Decoding server message", "bytes", bytes)
 	if len(bytes) < 3 || len(bytes) > 256 {
 		return nil, ErrServerMessageDecode
 	}
-	log.Debug().Int("tag-size", int(bytes[1])).Send()
+	zerologr.V(50).Info("", "tag-size", int(bytes[1]))
 	if len(bytes[2:]) != int(bytes[1]) {
 		return nil, ErrLockTagSize
 	}
 	messageType, err := decodeServerMessageType(bytes)
-	log.Debug().Int("server-msg-type", int(messageType)).Send()
+	zerologr.V(50).Info("", "server-msg-type", int(messageType))
 	if err != nil {
 		return nil, err
 	}
 	lockTag, err := decodeLockTag(bytes)
-	log.Debug().Str("lock-tag", lockTag).Send()
+	zerologr.V(50).Info("", "lock-tag", lockTag)
 	if err != nil {
 		return nil, err
 	}
@@ -99,23 +97,21 @@ func EncodeServerMessage(serverMessage *ServerMessage) []byte {
 //   - The client message type is not recognized.
 //   - The lock tag is not valid UTF8.
 func DecodeClientMessage(bytes []byte) (*ClientMessage, error) {
-	log.Debug().
-		Bytes("bytes", bytes).
-		Msg("decoding client message")
+	zerologr.V(50).Info("Decoding client message", "bytes", bytes)
 	if len(bytes) < 3 || len(bytes) > 256 {
 		return nil, ErrClientMessageDecode
 	}
-	log.Debug().Int("tag-size", int(bytes[1])).Send()
+	zerologr.V(50).Info("", "tag-size", int(bytes[1]))
 	if len(bytes[2:]) != int(bytes[1]) {
 		return nil, ErrLockTagSize
 	}
 	messageType, err := decodeClientMessageType(bytes)
-	log.Debug().Int("client-msg-type", int(messageType)).Send()
+	zerologr.V(50).Info("", "client-msg-type", int(messageType))
 	if err != nil {
 		return nil, err
 	}
 	lockTag, err := decodeLockTag(bytes)
-	log.Debug().Str("lock-tag", lockTag).Send()
+	zerologr.V(50).Info("", "lock-tag", lockTag)
 	if err != nil {
 		return nil, err
 	}
@@ -127,27 +123,19 @@ func DecodeClientMessage(bytes []byte) (*ClientMessage, error) {
 func EncodeClientMessage(clientMessage *ClientMessage) []byte {
 	const magic = 2
 
-	log.Debug().Msg("encoding client message")
+	zerologr.V(50).Info("Encoding client message")
 	bytes := make([]byte, magic+len(clientMessage.LockTag))
-	log.Debug().Int("len", len(bytes)).Msg("made slice")
+	zerologr.V(50).Info("Made slice", "len", len(bytes))
 	bytes[0] = byte(Acquired)
-	log.Debug().
-		Bytes("bytes", bytes).
-		Msg("added 'Acquired' message type")
+	zerologr.V(50).Info("Added 'Acquired' message type", "bytes", bytes)
 	//nolint:gosec // this is fine
 	bytes[1] = byte(len(clientMessage.LockTag))
-	log.Debug().
-		Bytes("bytes", bytes).
-		Msg("added lock tag size")
-	log.Debug().
-		Str("tag", clientMessage.LockTag).
-		Msg("encoding lock tag")
+	zerologr.V(50).Info("Added lock tag size", "bytes", bytes)
+	zerologr.V(50).Info("Encoding lock tag", "tag", clientMessage.LockTag)
 	for i := range len(clientMessage.LockTag) {
 		bytes[i+2] = clientMessage.LockTag[i]
 	}
-	log.Debug().
-		Bytes("bytes", bytes).
-		Msg("encoded client message")
+	zerologr.V(50).Info("Encoded client message", "bytes", bytes)
 
 	return bytes
 }
