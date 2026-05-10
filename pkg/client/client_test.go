@@ -48,7 +48,7 @@ func Test_ClientLifecycle(t *testing.T) {
 
 	client := New(&Opts{Host: "localhost", Port: 30005})
 	startErr := client.Connect()
-	if err != nil {
+	if startErr != nil {
 		t.Fatal("Failed to start client:", startErr)
 	}
 	client.Close()
@@ -104,7 +104,7 @@ func Test_ClientAcquireRelease(t *testing.T) {
 
 	client := New(&Opts{Host: "localhost", Port: 30006})
 	startErr := client.Connect()
-	if err != nil {
+	if startErr != nil {
 		t.Fatal("Failed to start client:", startErr)
 	}
 	_ = client.Acquire("123")
@@ -173,7 +173,7 @@ func Test_ClientOnAcquired(t *testing.T) {
 		}
 	}})
 	startErr := client.Connect()
-	if err != nil {
+	if startErr != nil {
 		t.Fatal("Failed to start client:", startErr)
 	}
 	_ = client.Acquire(EXPECTED_LOCK_TAG)
@@ -266,7 +266,7 @@ func Test_MutualTls(t *testing.T) {
 			RootCAs:      pool,
 			MinVersion:   tls.VersionTLS13,
 		},
-		stop: make(chan interface{}),
+		stopped: false,
 	}
 	t.Log("Connecting client")
 	err = c.Connect()

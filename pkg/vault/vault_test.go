@@ -8,14 +8,23 @@ import (
 
 type tql struct{}
 
+func newTQLVault() *vaultImpl {
+	v, _ := New(&Opts{
+		Version:   "test",
+		QueueType: Single,
+	})
+
+	i := v.(*vaultImpl)
+	i.queueLayer = &tql{}
+	return i
+}
+
 func (t *tql) Enqueue(locktag string, action func(int, string)) {
 	action(0, locktag)
 }
 
 func Test_Acquire(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
-	v := vault.(*vaultImpl)
-	v.queueLayer = &tql{}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -38,9 +47,7 @@ func Test_Acquire(t *testing.T) {
 }
 
 func Test_Release(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
-	v := vault.(*vaultImpl)
-	v.queueLayer = &tql{}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
@@ -68,11 +75,7 @@ func Test_Release(t *testing.T) {
 }
 
 func Test_Waitlist(t *testing.T) {
-	v := &vaultImpl{
-		slots:      []map[string]*lock{{}},
-		waitList:   make(map[string][]*func(int, string)),
-		queueLayer: &tql{},
-	}
+	v := newTQLVault()
 
 	order := make([]string, 0, 3)
 
@@ -116,10 +119,7 @@ func Test_Waitlist(t *testing.T) {
 }
 
 func Test_ReleaseBadManners(t *testing.T) {
-	v := &vaultImpl{
-		slots:      []map[string]*lock{{}},
-		queueLayer: &tql{},
-	}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
@@ -141,10 +141,7 @@ func Test_ReleaseBadManners(t *testing.T) {
 }
 
 func Test_UnecessaryRelease(t *testing.T) {
-	v := &vaultImpl{
-		slots:      []map[string]*lock{{}},
-		queueLayer: &tql{},
-	}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -162,10 +159,7 @@ func Test_UnecessaryRelease(t *testing.T) {
 }
 
 func Test_UnecessaryAcquire(t *testing.T) {
-	v := &vaultImpl{
-		slots:      []map[string]*lock{{}},
-		queueLayer: &tql{},
-	}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
@@ -188,10 +182,7 @@ func Test_UnecessaryAcquire(t *testing.T) {
 }
 
 func Test_CallbackError(t *testing.T) {
-	v := &vaultImpl{
-		slots:      []map[string]*lock{{}},
-		queueLayer: &tql{},
-	}
+	v := newTQLVault()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -227,7 +218,7 @@ func Test_CallbackError(t *testing.T) {
 }
 
 func TestVault_Cleanup(t *testing.T) {
-	v := &vaultImpl{queueLayer: &tql{}, slots: []map[string]*lock{{}}}
+	v := newTQLVault()
 
 	l := v.fetch(0, "test")
 	l.lock("client")
@@ -244,9 +235,7 @@ func TestVault_Cleanup(t *testing.T) {
 }
 
 func TestVault_CleanupWaitlist(t *testing.T) {
-	vault := New(&Opts{QueueType: Single})
-	v := vault.(*vaultImpl)
-	v.queueLayer = &tql{}
+	v := newTQLVault()
 
 	v.Acquire("test", "client", func(error) error { return nil })
 	v.Acquire("test", "client2", func(error) error { return nil })

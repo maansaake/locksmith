@@ -18,11 +18,14 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/callable-build.yaml
+    secrets: inherit
 
   unit-test:
     uses: ./.github/workflows/callable-test-unit.yaml
+    secrets: inherit
 
   image:
     uses: ./.github/workflows/image.yaml
+    secrets: inherit
     with:
       push: false

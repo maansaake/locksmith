@@ -2,13 +2,15 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/maansaake/locksmith/pkg/vault/queue"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type (
@@ -25,6 +27,9 @@ type (
 	}
 	QueueType string
 	Opts      struct {
+		// Used for telemetry.
+		Version string
+
 		// Single queue mode should only be used for testing.
 		QueueType
 
@@ -50,6 +55,11 @@ type (
 		slots      []map[string]*lock
 		queueLayer queue.Layer
 		waitList   map[string][]*func(slot int, lockTag string)
+
+		lockGauge        metric.Int64UpDownCounter
+		acquireCounter   metric.Int64Counter
+		releaseCounter   metric.Int64Counter
+		rejectionCounter metric.Int64Counter
 	}
 )
 
@@ -63,27 +73,6 @@ var (
 	ErrBadManners = errors.New(
 		"client tried to release lock that it did not own",
 	)
-
-	//nolint:gochecknoglobals // welp
-	locksGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "locksmith_locked_locks",
-		Help: "The total number of locked locks",
-	})
-	//nolint:gochecknoglobals // welp
-	acquireCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "locksmith_acquire_total",
-		Help: "The number of processed acquires",
-	})
-	//nolint:gochecknoglobals // welp
-	releaseCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "locksmith_release_total",
-		Help: "The number of processed releases",
-	})
-	//nolint:gochecknoglobals // welp
-	rejectionCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "locksmith_rejection_total",
-		Help: "The number of rejections due to bad manners and unnecessary releases/acquires",
-	}, []string{counterReasonLabel})
 )
 
 const (
@@ -96,25 +85,68 @@ const (
 	counterReasonLabel = "reason"
 )
 
-func New(options *Opts) Vault {
+func New(opts *Opts) (Vault, error) {
 	vault := &vaultImpl{
 		waitList: make(map[string][]*func(int, string)),
 	}
-	if options.QueueType == Single {
-		vault.queueLayer = queue.NewSingleQueue(options.QueueCapacity)
+
+	m := otel.GetMeterProvider().Meter(
+		"github.com/maansaake/locksmith/pkg/vault", metric.WithInstrumentationVersion(opts.Version),
+	)
+
+	lockGauge, err := m.Int64UpDownCounter(
+		"locksmith.locks",
+		metric.WithDescription("Number of held locks"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating locks gauge: %w", err)
+	}
+	vault.lockGauge = lockGauge
+
+	acquireCounter, err := m.Int64Counter(
+		"locksmith.acquires",
+		metric.WithDescription("Number of processed acquires"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating acquire counter: %w", err)
+	}
+	vault.acquireCounter = acquireCounter
+
+	releaseCounter, err := m.Int64Counter(
+		"locksmith.releases",
+		metric.WithDescription("Number of processed releases"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating release counter: %w", err)
+	}
+	vault.releaseCounter = releaseCounter
+
+	rejectionCounter, err := m.Int64Counter(
+		"locksmith.rejections",
+		metric.WithDescription(
+			"Number of rejections due to bad manners and unnecessary releases/acquires",
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating rejection counter: %w", err)
+	}
+	vault.rejectionCounter = rejectionCounter
+
+	if opts.QueueType == Single {
+		vault.queueLayer = queue.NewSingleQueue(opts.QueueCapacity)
 		vault.slots = make([]map[string]*lock, 1)
 		vault.slots[0] = map[string]*lock{}
 	} else {
 		vault.queueLayer = queue.NewMultiQueue(
-			options.QueueConcurrency, options.QueueCapacity,
+			opts.QueueConcurrency, opts.QueueCapacity,
 		)
-		vault.slots = make([]map[string]*lock, options.QueueConcurrency)
+		vault.slots = make([]map[string]*lock, opts.QueueConcurrency)
 		for i := range vault.slots {
 			vault.slots[i] = map[string]*lock{}
 		}
 	}
 
-	return vault
+	return vault, nil
 }
 
 // Acquire attempts to acquire a lock. If the lock is currently busy, the
@@ -125,10 +157,7 @@ func (vault *vaultImpl) Acquire(
 	client string,
 	callback func(error) error,
 ) {
-	log.Info().
-		Str("client", client).
-		Str("tag", lockTag).
-		Msg("acquiring")
+	zerologr.Info("Acquiring", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(
 		lockTag, vault.acquireAction(client, callback),
 	)
@@ -144,15 +173,19 @@ func (vault *vaultImpl) acquireAction(
 	callback func(error) error,
 ) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("acquire")
+		zerologr.V(50).Info("Acquire", "tag", lockTag, "client", client, "slot", slot)
 		lock := vault.fetch(slot, lockTag)
 		// a second acquire is a protocol offense, callback with error and
 		// release the lock, pop waitlisted client.
 		//nolint:gocritic // why not
 		if lock.isOwner(client) {
 			lock.unlock()
-			locksGauge.Dec()
-			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_acquire"}).Inc()
+			vault.lockGauge.Add(context.TODO(), -1)
+			vault.rejectionCounter.Add(
+				context.TODO(),
+				1,
+				metric.WithAttributeSet(attribute.NewSet(attribute.String(counterReasonLabel, "unnecessary_acquire"))),
+			)
 
 			_ = callback(ErrUnnecessaryAcquire)
 
@@ -171,8 +204,8 @@ func (vault *vaultImpl) acquireAction(
 				vault.popWaitlist(slot, lockTag)
 			} else {
 				lock.lock(client)
-				locksGauge.Inc()
-				acquireCounter.Inc()
+				vault.lockGauge.Add(context.TODO(), 1)
+				vault.acquireCounter.Add(context.TODO(), 1)
 			}
 		}
 	}
@@ -185,10 +218,7 @@ func (vault *vaultImpl) Release(
 	client string,
 	callback func(error) error,
 ) {
-	log.Info().
-		Str("client", client).
-		Str("tag", lockTag).
-		Msg("releasing")
+	zerologr.Info("Releasing", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(lockTag, vault.releaseAction(client, callback))
 }
 
@@ -201,26 +231,34 @@ func (vault *vaultImpl) releaseAction(
 	callback func(error) error,
 ) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("release")
+		zerologr.V(50).Info("Release", "tag", lockTag, "client", client, "slot", slot)
 		currentState := vault.fetch(slot, lockTag)
 		// if already unlocked, kill the client for not following the protocol
 		//nolint:gocritic // why not
 		if !currentState.isLocked() {
-			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "unnecessary_release"}).Inc()
+			vault.rejectionCounter.Add(
+				context.TODO(),
+				1,
+				metric.WithAttributeSet(attribute.NewSet(attribute.String(counterReasonLabel, "unnecessary_release"))),
+			)
 
 			_ = callback(ErrUnnecessaryRelease)
 			// else, the lock is in LOCKED state, so check the owner, if
 			// client isn't the owner, it's misbehaving and needs to be killed
 		} else if !currentState.isOwner(client) {
-			rejectionCounter.With(prometheus.Labels{counterReasonLabel: "bad_manners"}).Inc()
+			vault.rejectionCounter.Add(
+				context.TODO(),
+				1,
+				metric.WithAttributeSet(attribute.NewSet(attribute.String(counterReasonLabel, "bad_manners"))),
+			)
 
 			_ = callback(ErrBadManners)
 			// else, client is the owner of the lock, release it and call
 			// callback
 		} else {
 			currentState.unlock()
-			locksGauge.Dec()
-			releaseCounter.Inc()
+			vault.lockGauge.Add(context.TODO(), -1)
+			vault.releaseCounter.Add(context.TODO(), 1)
 
 			_ = callback(nil) // We don't care about release errors
 
@@ -231,7 +269,7 @@ func (vault *vaultImpl) releaseAction(
 
 // Cleans up a locktag associated with a given client.
 func (vault *vaultImpl) Cleanup(lockTag, client string) {
-	log.Info().Str("client", client).Str("tag", lockTag).Msg("cleaning up")
+	zerologr.Info("Cleaning up", "client", client, "tag", lockTag)
 	vault.queueLayer.Enqueue(
 		lockTag, vault.cleanupAction(client),
 	)
@@ -243,11 +281,11 @@ func (vault *vaultImpl) Cleanup(lockTag, client string) {
 // handles the vault's lock states.
 func (vault *vaultImpl) cleanupAction(client string) func(int, string) {
 	return func(slot int, lockTag string) {
-		log.Debug().Str("tag", lockTag).Str("client", client).Int("slot", slot).Msg("cleanup")
+		zerologr.V(50).Info("Cleanup", "tag", lockTag, "client", client, "slot", slot)
 		if currentState := vault.fetch(slot, lockTag); currentState.isOwner(client) {
 			currentState.unlock()
-			locksGauge.Dec()
-			releaseCounter.Inc()
+			vault.lockGauge.Add(context.TODO(), -1)
+			vault.releaseCounter.Add(context.TODO(), 1)
 
 			vault.popWaitlist(slot, lockTag)
 		}
@@ -268,21 +306,21 @@ func (vault *vaultImpl) fetch(slot int, lockTag string) *lock {
 // Waitlist the input action, related to the given lock tag. Appends the action
 // to the back of the waitlist of the lock tag.
 func (vault *vaultImpl) waitlist(lockTag string, callback func(int, string)) {
-	log.Debug().Str("tag", lockTag).Msg("waitlisting")
+	zerologr.V(50).Info("Waitlisting", "tag", lockTag)
 	_, ok := vault.waitList[lockTag]
 	if !ok {
 		vault.waitList[lockTag] = []*func(int, string){&callback}
 	} else {
 		vault.waitList[lockTag] = append(vault.waitList[lockTag], &callback)
 	}
-	log.Debug().Str("tag", lockTag).Int("waitlisted", len(vault.waitList[lockTag])).Send()
+	zerologr.V(50).Info("", "tag", lockTag, "waitlisted", len(vault.waitList[lockTag]))
 }
 
 // IMPORTANT: only call from synchronized Go-routines.
 // Pop from the waitlist belonging to the input lock tag, results in a waitlisted
 // action being called directly.
 func (vault *vaultImpl) popWaitlist(slot int, lockTag string) {
-	log.Debug().Str("tag", lockTag).Msg("popping from waitlist")
+	zerologr.V(50).Info("Popping from waitlist", "tag", lockTag)
 	if wl, ok := vault.waitList[lockTag]; ok && len(wl) > 0 {
 		first := wl[0]
 
@@ -291,12 +329,12 @@ func (vault *vaultImpl) popWaitlist(slot int, lockTag string) {
 		} else {
 			vault.waitList[lockTag] = wl[1:]
 		}
-		log.Debug().Str("tag", lockTag).Interface("waitlisted", len(wl)-1).Send()
+		zerologr.V(50).Info("", "tag", lockTag, "waitlisted", len(wl)-1)
 
 		f := *first
 		f(slot, lockTag)
 	} else {
-		log.Debug().Msg("no waitlisted clients found")
+		zerologr.V(50).Info("No waitlisted clients found")
 	}
 }
 

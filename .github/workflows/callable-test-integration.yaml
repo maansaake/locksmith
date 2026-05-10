@@ -2,12 +2,20 @@ name: Unit test
 
 on:
   workflow_call:
+    inputs:
+      version:
+        type: string
+        description: "Version to test."
+        required: false
+        default: "unstable"
 
 permissions:
   contents: read
 
 jobs:
-  unit-test:
+  integrations-test:
+    env:
+      VERSION: ${{ inputs.version }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -36,18 +44,37 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: unit-test-${{ steps.checksum.outputs.checksum }}
-          restore-keys: unit-test-
+          key: integration-test-${{ steps.checksum.outputs.checksum }}
+          restore-keys: integration-test-
 
-      - name: Run tests
+      - name: Run test environment
+        run: make compose
+
+      - name: Run integration tests
+        run: make integration-test-json
+
+      - name: Publish integration test results
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        if: always()
+        with:
+          name: Integration Tests
+          path: build/integration-test-output.json
+          reporter: golang-json
+          fail-on-error: "false"
+
+      - name: Collect logs on failure
+        if: failure()
         run: |
-          make unit-test-cover
+          mkdir -p build
+          make compose-logs > build/integration-test.log
 
-      - name: Generate coverage report
-        run: go tool cover -html=coverage.out -o coverage.html
-
-      - name: Upload coverage report
+      - name: Upload logs
+        if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: go-coverage-report-${{ matrix.go-version-alias }}
-          path: coverage.html
+          name: integration-test-log
+          path: build/integration-test.log
+
+      - name: Teardown test environment
+        if: always()
+        run: make compose-down

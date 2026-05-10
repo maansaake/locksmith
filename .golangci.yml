@@ -327,6 +327,7 @@ linters:
         - os.WriteFile
         - prometheus.ExponentialBuckets.*
         - prometheus.LinearBuckets
+        - zerologr.V
 
     nakedret:
       # Make an issue if func has more lines of code than this setting, and it has naked returns.
@@ -336,7 +337,7 @@ linters:
     nolintlint:
       # Exclude following linters from requiring an explanation.
       # Default: []
-      allow-no-explanation: [ funlen, gocognit, golines ]
+      allow-no-explanation: [funlen, gocognit, golines]
       # Enable to require an explanation of nonzero length after each nolint directive.
       # Default: false
       require-explanation: true
@@ -405,6 +406,7 @@ linters:
     paths:
       - pkg/vault/vault_mock.go
       - cmd/locksmithctl/main.go
+      - test
 
     # Log a warning if an exclusion rule is unused.
     # Default: false
@@ -417,12 +419,12 @@ linters:
     # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
       - text: "ALL_CAPS in Go names"
-        linters: [ revive, staticcheck ]
+        linters: [revive, staticcheck]
       - text: "should have a package comment"
-        linters: [ revive ]
+        linters: [revive]
       - text: "exported \\S+ \\S+ should have comment( \\(or a comment on this
           block\\))? or be unexported"
-        linters: [ revive ]
+        linters: [revive]
 
 run:
   tests: false

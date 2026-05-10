@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/maansaake/locksmith/pkg/protocol"
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 type (
@@ -35,7 +35,9 @@ type (
 		tlsConfig  *tls.Config
 		onAcquired func(lockTag string)
 		conn       net.Conn
-		stop       chan interface{}
+
+		running bool
+		stopped bool
 	}
 )
 
@@ -45,7 +47,9 @@ func New(options *Opts) Client {
 		port:       options.Port,
 		tlsConfig:  options.TLSConfig,
 		onAcquired: options.OnAcquired,
-		stop:       make(chan interface{}),
+
+		running: false,
+		stopped: false,
 	}
 }
 
@@ -54,12 +58,15 @@ func New(options *Opts) Client {
 // error, even if something is wrong, until the first client write is issues. This is
 // because of how TLS 13 is implemented.
 func (c *clientImpl) Connect() error {
+	if c.running {
+		zerologr.Info("Client already running, skipping Connect()")
+		return nil
+	}
+
 	var err error
 	address := net.JoinHostPort(c.host, strconv.FormatUint(uint64(c.port), 10))
 	if c.tlsConfig != nil {
-		log.Info().
-			Str("address", address).
-			Msg("dialing (TLS) server")
+		zerologr.Info("Dialing (TLS) server", "address", address)
 		//nolint:noctx // TODO: fix
 		c.conn, err = tls.Dial(
 			"tcp",
@@ -67,17 +74,18 @@ func (c *clientImpl) Connect() error {
 			c.tlsConfig,
 		)
 	} else {
-		log.Info().
-			Str("address", address).
-			Msg("dialing server")
+		zerologr.Info("Dialing server", "address", address)
 		//nolint:noctx // TODO: fix
 		c.conn, err = net.Dial("tcp", address)
 	}
 	if err != nil {
+		zerologr.Error(err, "Failed to connect to server", "address", address)
 		return err
 	}
-	log.Info().Msg("connected")
+	zerologr.Info("Connected")
 
+	c.running = true
+	c.stopped = false
 	go c.handleConnection()
 
 	return nil
@@ -92,39 +100,33 @@ func (c *clientImpl) handleConnection() {
 	buf := &bytes.Buffer{}
 	for {
 		n, err := c.conn.Read(read)
-		if err != nil {
+		if err != nil { //nolint:nestif // it is what it is
 			if errors.Is(err, io.EOF) {
-				log.Info().
-					Str("address", c.conn.RemoteAddr().String()).
-					Msg("connection closed by remote (EOF)")
+				zerologr.Info("Connection closed by remote (EOF)", "address", c.conn.RemoteAddr().String())
 			} else {
-				select {
-				case <-c.stop:
-					log.Info().Msg("stopping client connection gracefully")
-				default:
-					log.Error().
-						Err(err).
-						Msg("connection read error: ")
+				if c.stopped {
+					zerologr.Info("Stopping client connection gracefully")
+				} else {
+					zerologr.Error(err, "Connection read error")
 				}
 			}
 
 			break
 		}
 
-		log.Debug().Int("bytes", n).Msg("read from connection")
-		log.Debug().Bytes("read", read[:n]).Send()
+		zerologr.V(50).Info("Read from connection", "bytes", n)
+		zerologr.V(50).Info("", "read", read[:n])
 
 		buf.Write(read[:n])
 
 		//nolint:govet // TODO: look into
 		if err := c.handleBuf(buf); err != nil {
-			log.Error().
-				Err(err).
-				Str("address", c.conn.RemoteAddr().String()).
-				Msg("message handling error, closing connection")
+			zerologr.Error(err, "Message handling error, closing connection", "address", c.conn.RemoteAddr().String())
 			break
 		}
 	}
+
+	c.running = false
 }
 
 func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
@@ -171,15 +173,13 @@ func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
 	case protocol.Acquired:
 		c.onAcquired(msg.LockTag)
 	default:
-		log.Error().
-			Str("type", string(msg.Type)).
-			Msg("Client message type not recognized: ")
+		zerologr.Info("Client message type not recognized", "type", msg.Type)
 	}
 }
 
-// Close disconnects from the Locksmith instance.
+// Close disconnects from the Locksmith instance. Safe to call multiple times.
 func (c *clientImpl) Close() {
-	close(c.stop)
+	c.stopped = true
 	_ = c.conn.Close()
 }
 

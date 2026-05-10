@@ -13,7 +13,7 @@ import (
 	"github.com/maansaake/locksmith/pkg/connection"
 	"github.com/maansaake/locksmith/pkg/protocol"
 	"github.com/maansaake/locksmith/pkg/vault"
-	"github.com/rs/zerolog/log"
+	"github.com/trebent/zerologr"
 )
 
 type (
@@ -24,6 +24,9 @@ type (
 	}
 	// Opts exposes the possible options to pass to a new Locksmith instance.
 	Opts struct {
+		// Used for telemetry.
+		Version string
+
 		// Port denotes the port which will listen for incoming connections.
 		Port uint16
 
@@ -47,21 +50,25 @@ type (
 )
 
 // New creates a new Locksmith instance with the provided options.
-func New(options *Opts) *Locksmith {
-	locksmith := &Locksmith{
-		vault: vault.New(&vault.Opts{
-			QueueType:        options.QueueType,
-			QueueConcurrency: options.QueueConcurrency,
-			QueueCapacity:    options.QueueCapacity,
-		}),
+func New(opts *Opts) (*Locksmith, error) {
+	vault, err := vault.New(&vault.Opts{
+		Version:          opts.Version,
+		QueueType:        opts.QueueType,
+		QueueConcurrency: opts.QueueConcurrency,
+		QueueCapacity:    opts.QueueCapacity,
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	locksmith := &Locksmith{vault: vault}
 	locksmith.tcpAcceptor = connection.NewTCPAcceptor(&connection.TCPAcceptorOptions{
 		Handler:   locksmith.handleConnection,
-		Port:      options.Port,
-		TLSConfig: options.TLSConfig,
+		Port:      opts.Port,
+		TLSConfig: opts.TLSConfig,
 	})
 
-	return locksmith
+	return locksmith, nil
 }
 
 // Start the Locksmith instance. This is a blocking call that can be unblocked
@@ -69,16 +76,15 @@ func New(options *Opts) *Locksmith {
 func (l *Locksmith) Start(ctx context.Context) error {
 	err := l.tcpAcceptor.Start()
 	if err != nil {
-		log.Error().Msg("failed to start TCP acceptor")
 		return err
 	}
-	log.Info().Msg("started locksmith")
+	zerologr.Info("Started locksmith")
 
 	<-ctx.Done()
-	log.Info().Msg("stopping locksmith")
+	zerologr.Info("Stopping locksmith")
 	l.tcpAcceptor.Stop()
 
-	return err
+	return nil
 }
 
 // Handler for connections accepted by the TCP acceptor. This function contains
@@ -89,9 +95,7 @@ func (l *Locksmith) Start(ctx context.Context) error {
 func (l *Locksmith) handleConnection(conn net.Conn) {
 	const bufSize = 256
 
-	log.Info().
-		Str("address", conn.RemoteAddr().String()).
-		Msg("connection accepted")
+	zerologr.Info("Connection accepted", "address", conn.RemoteAddr().String())
 
 	// On connection close, clean up client data
 	clientContext := &clientContext{
@@ -106,29 +110,22 @@ func (l *Locksmith) handleConnection(conn net.Conn) {
 		n, err := clientContext.conn.Read(read)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				log.Info().
-					Str("address", clientContext.conn.RemoteAddr().String()).
-					Msg("connection closed by remote (EOF)")
+				zerologr.Info("Connection closed by remote (EOF)", "address", clientContext.conn.RemoteAddr().String())
 			} else {
-				log.Error().
-					Err(err).
-					Msg("connection read error, closing connection")
+				zerologr.Error(err, "Connection read error, closing connection")
 			}
 
 			break
 		}
 
-		log.Debug().Int("bytes", n).Msg("read from connection")
-		log.Debug().Bytes("read", read[:n]).Send()
+		zerologr.V(50).Info("Read from connection", "bytes", n)
+		zerologr.V(50).Info("", "read", read[:n])
 
 		buf.Write(read[:n])
 
 		//nolint:govet // TODO: look into
 		if err := l.handleBuf(buf, clientContext); err != nil {
-			log.Error().
-				Err(err).
-				Str("address", conn.RemoteAddr().String()).
-				Msg("message handling error, closing connection")
+			zerologr.Error(err, "Message handling error, closing connection", "address", conn.RemoteAddr().String())
 			break
 		}
 	}
@@ -195,7 +192,7 @@ func (l *Locksmith) handleMsg(
 		)
 		clientContext.remove(serverMessage.LockTag)
 	default:
-		log.Error().Msg("invalid message type")
+		zerologr.Info("Invalid message type")
 	}
 }
 
@@ -215,18 +212,18 @@ func (l *Locksmith) acquireCallback(
 ) func(error) error {
 	return func(err error) error {
 		if err != nil {
-			log.Error().Err(err).Msg("got error in acquire callback")
+			zerologr.Error(err, "Got error in acquire callback")
 			_ = conn.Close()
 			return nil
 		}
 
-		log.Debug().Str("locktag", lockTag).Msg("notifying client of acquisition")
+		zerologr.V(50).Info("Notifying client of acquisition", "locktag", lockTag)
 		_, writeErr := conn.Write(protocol.EncodeClientMessage(&protocol.ClientMessage{
 			Type:    protocol.Acquired,
 			LockTag: lockTag,
 		}))
 		if writeErr != nil {
-			log.Error().Err(writeErr).Msg("failed to write to client")
+			zerologr.Error(writeErr, "Failed to write to client")
 			return writeErr
 		}
 
@@ -242,7 +239,7 @@ func (l *Locksmith) releaseCallback(
 ) func(error) error {
 	return func(err error) error {
 		if err != nil {
-			log.Error().Err(err).Msg("got error in release callback")
+			zerologr.Error(err, "Got error in release callback")
 			_ = conn.Close()
 		}
 

@@ -4,188 +4,115 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net/http"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/maansaake/locksmith/pkg/env"
+	"github.com/maansaake/locksmith/internal/env"
+	"github.com/maansaake/locksmith/internal/otel"
 	locksmith "github.com/maansaake/locksmith/pkg/locksmith"
 	"github.com/maansaake/locksmith/pkg/vault"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+
+	"github.com/trebent/zerologr"
 )
 
-//nolint:funlen // what
 func main() {
-	// Set global log level
-	logLevel, _ := env.GetOptionalString(env.LOCKSMITH_LOG_LEVEL, env.LOCKSMITH_LOG_LEVEL_DEFAULT)
-	zerolog.SetGlobalLevel(translateToZerologLevel(logLevel))
-
-	logOutputEnv, err := env.GetOptionalString(env.LOCKSMITH_LOG_OUTPUT, env.LOCKSMITH_LOG_OUTPUT_DEFAULT)
-	checkError(err)
-
-	logOutput := os.Stderr
-	if logOutputEnv == "stdout" {
-		logOutput = os.Stdout
-	}
-
-	console, err := env.GetOptionalBool(env.LOCKSMITH_LOG_OUTPUT_CONSOLE, env.LOCKSMITH_LOG_OUTPUT_CONSOLE_DEFAULT)
-	checkError(err)
-
-	if console {
-		//nolint:reassign // welp
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: logOutput})
-	} else {
-		//nolint:reassign // welp
-		log.Logger = log.Output(logOutput)
-	}
-
-	version, _ := env.GetOptionalString(env.LOCKSMITH_VERSION, env.LOCKSMITH_VERSION_DEFAULT)
-	commit, _ := env.GetOptionalString(env.LOCKSMITH_VERSION, env.LOCKSMITH_VERSION_DEFAULT)
-	log.Info().
-		Str("version", version).
-		Str("commit", commit).
-		Msg("starting Locksmith")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Check if Prometheus metrics are enabled, start the metrics server if so.
-	var metricsServer *http.Server
-	metrics, err := env.GetOptionalBool(env.LOCKSMITH_METRICS, env.LOCKSMITH_METRICS_DEFAULT)
-	checkError(err)
-
-	if metrics {
-		http.Handle("/metrics", promhttp.Handler())
-		metricsServer = &http.Server{Addr: ":20000", ReadHeaderTimeout: 1 * time.Second}
-		go func() {
-			log.Info().Str("address", metricsServer.Addr).Msg("starting metrics server")
-			//nolint:govet // TODO: look into
-			if err := metricsServer.ListenAndServe(); err != http.ErrServerClosed {
-				log.Error().Err(err).Msg("metrics server failure")
-			} else {
-				log.Info().Msg("stopped metrics server")
-			}
-		}()
-	}
-
-	go func() {
-		signalch := make(chan os.Signal, 1)
-		signal.Notify(signalch, syscall.SIGINT, syscall.SIGTERM)
-		signal := <-signalch
-		log.Info().Any("signal", signal).Msg("captured stop signal")
-		if metrics {
-			//nolint:govet // TODO: look into
-			if err := metricsServer.Shutdown(ctx); err != nil {
-				log.Error().Err(err).Msg("error shutting down metrics server")
-			}
-		}
-		cancel()
-	}()
-
-	port, err := env.GetOptionalUint16(env.LOCKSMITH_PORT, env.LOCKSMITH_PORT_DEFAULT)
-	checkError(err)
-
-	queueType, err := env.GetOptionalString(env.LOCKSMITH_Q_TYPE, env.LOCKSMITH_Q_TYPE_DEFAULT)
-	checkError(err)
-
-	concurrency, err := env.GetOptionalInteger(env.LOCKSMITH_Q_CONCURRENCY, env.LOCKSMITH_Q_CONCURRENCY_DEFAULT)
-	checkError(err)
-
-	capacity, err := env.GetOptionalInteger(env.LOCKSMITH_Q_CAPACITY, env.LOCKSMITH_Q_CAPACITY_DEFAULT)
-	checkError(err)
-
-	locksmithOptions := &locksmith.Opts{
-		Port:             port,
-		QueueType:        vault.QueueType(queueType),
-		QueueConcurrency: concurrency,
-		QueueCapacity:    capacity,
-	}
-
-	tls, err := env.GetOptionalBool(env.LOCKSMITH_TLS, env.LOCKSMITH_TLS_DEFAULT)
-	checkError(err)
-
-	if tls {
-		locksmithOptions.TLSConfig = getTLSConfig()
-	}
-
-	//nolint:govet // TODO: look into
-	if err := locksmith.New(locksmithOptions).Start(ctx); err != nil {
-		log.Error().Err(err).Msg("server start error")
-		//nolint:gocritic // idk
+	if err := env.Parse(); err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing environment variables: %v\n", err)
 		os.Exit(1)
 	}
 
-	log.Info().Msg("server stopped")
-}
+	logger := zerologr.New(&zerologr.Opts{
+		Console: env.LogOutput.Value() == "console",
+		Caller:  true,
+		V:       env.LogVerbosity.Value(),
+	})
+	zerologr.Set(logger)
 
-func translateToZerologLevel(level string) zerolog.Level {
-	switch level {
-	case "DEBUG":
-		return zerolog.DebugLevel
-	case "INFO":
-		return zerolog.InfoLevel
-	case "WARNING":
-		return zerolog.WarnLevel
-	case "ERROR":
-		return zerolog.ErrorLevel
-	case "FATAL":
-		return zerolog.FatalLevel
-	case "PANIC":
-		return zerolog.PanicLevel
+	signalCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	cleanup, err := setupMetrics(signalCtx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error setting up metrics: %v\n", err)
+		os.Exit(1) //nolint:gocritic // intended to exit on metrics setup failure
+	}
+	defer cleanup(context.Background()) //nolint:errcheck // impossible to handle
+
+	locksmithOptions := &locksmith.Opts{
+		Version:          env.Version.Value(),
+		Port:             uint16(env.Port.Value()), //nolint:gosec // validated on parse
+		QueueType:        vault.QueueType(env.QueueType.Value()),
+		QueueConcurrency: env.QueueConcurrency.Value(),
+		QueueCapacity:    env.QueueCapacity.Value(),
 	}
 
-	log.Warn().Msg("unable to decode log level")
-	return zerolog.NoLevel
+	if env.TLS.Value() {
+		tlsConfig, err := getTLSConfig() //nolint:govet // shad
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading TLS config: %v\n", err)
+			os.Exit(1)
+		}
+
+		locksmithOptions.TLSConfig = tlsConfig
+	}
+
+	zerologr.Info(
+		"Starting locksmith",
+		"port", locksmithOptions.Port,
+		"tls_enabled", locksmithOptions.TLSConfig != nil,
+		"queue_type", locksmithOptions.QueueType,
+		"queue_concurrency", locksmithOptions.QueueConcurrency,
+		"queue_capacity", locksmithOptions.QueueCapacity,
+	)
+
+	ls, err := locksmith.New(locksmithOptions)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating Locksmith instance: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := ls.Start(signalCtx); err != nil { //nolint:govet // shad
+		fmt.Fprintf(os.Stderr, "Locksmith start error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-// Fetch TLS config to supply the TCP listener.
-func getTLSConfig() *tls.Config {
+// setupMetrics initializes OpenTelemetry instrumentation if enabled via environment variables.
+// It returns a shutdown function that should be deferred for proper cleanup.
+func setupMetrics(ctx context.Context) (func(context.Context) error, error) {
+	if env.ObservabilityEnabled.Value() {
+		zerologr.Info("Observability enabled, instrumenting using OTEL", "runtime_metrics", env.RuntimeMetrics.Value())
+		return otel.Instrument(ctx, "locksmith", env.Version.Value(), env.RuntimeMetrics.Value())
+	}
+
+	return func(context.Context) error { return nil }, nil
+}
+
+// getTLSConfig loads TLS configuration based on environment variables. It returns a
+// tls.Config struct or an error if the configuration is invalid.
+func getTLSConfig() (*tls.Config, error) {
 	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
 
-	serverCertPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_CERT_PATH, env.LOCKSMITH_TLS_CERT_PATH_DEFAULT)
-	checkError(err)
-
-	serverKeyPath, err := env.GetOptionalString(env.LOCKSMITH_TLS_KEY_PATH, env.LOCKSMITH_TLS_KEY_PATH_DEFAULT)
-	checkError(err)
-
-	cert, err := tls.LoadX509KeyPair(serverCertPath, serverKeyPath)
-	checkError(err)
+	cert, err := tls.LoadX509KeyPair(env.TLSCertPath.Value(), env.TLSKeyPath.Value())
+	if err != nil {
+		return nil, err
+	}
 
 	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	requireClientVerify, err := env.GetOptionalBool(
-		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT,
-		env.LOCKSMITH_TLS_REQUIRE_CLIENT_CERT_DEFAULT,
-	)
-	checkError(err)
-
-	if requireClientVerify {
-		//nolint:govet // TODO: look into
-		clientCaCertPath, err := env.GetOptionalString(
-			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH,
-			env.LOCKSMITH_TLS_CLIENT_CA_CERT_PATH_DEFAULT,
-		)
-		checkError(err)
-
+	if env.TLSRequireClientCert.Value() {
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		caCert, err := os.ReadFile(clientCaCertPath)
-		checkError(err)
+		caCert, err := os.ReadFile(env.TLSClientCACertPath.Value()) //nolint:govet // shad
+		if err != nil {
+			return nil, err
+		}
 
 		pool := x509.NewCertPool()
 		pool.AppendCertsFromPEM(caCert)
 		tlsConfig.ClientCAs = pool
 	}
 
-	return tlsConfig
-}
-
-// Panics if the error is not nil.
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-	}
+	return tlsConfig, nil
 }
