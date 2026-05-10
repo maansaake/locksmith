@@ -63,6 +63,7 @@ func (a *ctlSession) run() error {
 
 		// OnDisconnected fires when the connection drops unexpectedly.
 		OnDisconnected: func() {
+			a.clearLocks()
 			a.setConnected(false)
 			fmt.Printf("\r\033[K%s\n", renderDisconnectWarning())
 			a.reprintPrompt()
@@ -101,44 +102,15 @@ func (a *ctlSession) run() error {
 	return nil
 }
 
-// reprintPrompt re-draws the prompt after an async notification.
-// It is safe to call from any goroutine; it only prints if liner is active.
+// reprintPrompt re-draws the prompt, for example after an async notification.
 func (a *ctlSession) reprintPrompt() {
-	a.mu.Lock()
-	l := a.line
-	a.mu.Unlock()
-	if l != nil {
-		fmt.Print(promptStr())
-	}
+	fmt.Print(promptStr())
 }
 
-// runREPL is the main input loop.  It uses liner for readline-style editing,
-// command history, and tab completion.  Each typed line is dispatched through
+// runREPL is the main input loop. It uses liner for readline-style editing,
+// command history, and tab completion. Each typed line is dispatched through
 // a cobra command tree so every command benefits from cobra's argument handling.
-<<<<<<< Updated upstream
-func (a *lockApp) runREPL() {
-=======
 func (a *ctlSession) runREPL() {
-	// liner.NewLiner() reads from os.Stdin.  When stdin is redirected (e.g.
-	// inside a Docker container without -t, through a pipe, or in some IDEs),
-	// liner's terminal-support detection fails and Prompt() returns io.EOF
-	// immediately.  Opening /dev/tty directly gives liner access to the actual
-	// controlling terminal regardless of how stdin is connected.
-	//
-	// os.Stdin is restored immediately after liner.NewLiner() captures its
-	// internal reader — the reassignment window is a few nanoseconds and no
-	// concurrent goroutine reads os.Stdin (the client goroutine reads from the
-	// TCP connection; the signal handler reads from a channel).
-	if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
-		orig := os.Stdin
-		os.Stdin = tty
-		defer func() {
-			os.Stdin = orig
-			tty.Close()
-		}()
-	}
-
->>>>>>> Stashed changes
 	l := liner.NewLiner()
 	l.SetCtrlCAborts(true)
 
@@ -150,7 +122,7 @@ func (a *ctlSession) runREPL() {
 		a.mu.Lock()
 		a.line = nil
 		a.mu.Unlock()
-		l.Close()
+		_ = l.Close()
 	}()
 
 	a.setupCompletion(l)
@@ -173,6 +145,7 @@ func (a *ctlSession) runREPL() {
 		l.AppendHistory(input)
 
 		root.SetArgs(strings.Fields(input))
+		//nolint:govet // shad
 		if err := root.Execute(); err != nil {
 			// Cobra returns an error for unknown commands (SilenceErrors suppresses
 			// its own printing so we render a styled message here).
@@ -259,6 +232,14 @@ func (a *ctlSession) acquireCmd() *cobra.Command {
 		Use:   "acquire [lock]",
 		Short: "Acquire a lock",
 		RunE: func(_ *cobra.Command, args []string) error {
+			if !a.isConnected() {
+				fmt.Println(
+					errorStyle.Render("✗ Not connected.") + "  " +
+						mutedStyle.Render("Use 'reconnect' to reconnect."),
+				)
+				return nil
+			}
+
 			tag := ""
 			if len(args) >= 1 {
 				tag = args[0]
@@ -273,28 +254,29 @@ func (a *ctlSession) acquireCmd() *cobra.Command {
 							Value(&tag),
 					),
 				)
-				if err := form.Run(); err != nil || tag == "" {
+
+				if err := form.Run(); err != nil {
+					fmt.Println(errorStyle.Render("✗ Acquire failed: " + err.Error()))
+					return nil //nolint:nilerr // error already printed
+				}
+
+				if tag == "" {
+					fmt.Println(mutedStyle.Render("No lock tag entered."))
 					return nil
 				}
 			}
 
-			if !a.isConnected() {
-				fmt.Println(
-					errorStyle.Render("✗ Not connected.") + "  " +
-						mutedStyle.Render("Use 'reconnect' to reconnect."),
-				)
-				return nil
+			if err := a.c.Acquire(tag); err != nil {
+				fmt.Println(errorStyle.Render("✗ Acquire failed: " + err.Error()))
+				return nil //nolint:nilerr // error already printed
 			}
 
-			if err := a.c.Acquire(tag); err != nil {
-				fmt.Println(errorStyle.Render("✗ Acquire error: " + err.Error()))
-			} else {
-				fmt.Println(
-					infoStyle.Render("→ Acquire request sent for ") +
-						lockTagStyle.Render(tag) + "  " +
-						mutedStyle.Render("(waiting for server acknowledgement…)"),
-				)
-			}
+			fmt.Println(
+				infoStyle.Render("→ Acquire request sent for ") +
+					lockTagStyle.Render(tag) + "  " +
+					mutedStyle.Render("(waiting for server acknowledgement…)"),
+			)
+
 			return nil
 		},
 	}
@@ -305,6 +287,14 @@ func (a *ctlSession) releaseCmd() *cobra.Command {
 		Use:   "release [lock]",
 		Short: "Release a lock",
 		RunE: func(_ *cobra.Command, args []string) error {
+			if !a.isConnected() {
+				fmt.Println(
+					errorStyle.Render("✗ Not connected.") + "  " +
+						mutedStyle.Render("Use 'reconnect' to reconnect."),
+				)
+				return nil
+			}
+
 			tag := ""
 			if len(args) >= 1 {
 				tag = args[0]
@@ -323,23 +313,23 @@ func (a *ctlSession) releaseCmd() *cobra.Command {
 							Value(&tag),
 					),
 				)
-				if err := form.Run(); err != nil || tag == "" {
+
+				if err := form.Run(); err != nil {
+					fmt.Println(errorStyle.Render("✗ Release failed: " + err.Error()))
+					return nil //nolint:nilerr // error already printed
+				}
+
+				if tag == "" {
+					fmt.Println(mutedStyle.Render("No lock selected."))
 					return nil
 				}
 			}
 
-			if !a.isConnected() {
-				fmt.Println(
-					errorStyle.Render("✗ Not connected.") + "  " +
-						mutedStyle.Render("Use 'reconnect' to reconnect."),
-				)
-				return nil
+			if err := a.c.Release(tag); err != nil {
+				fmt.Println(errorStyle.Render("✗ Release failed: " + err.Error()))
+				return nil //nolint:nilerr // error already printed
 			}
 
-			if err := a.c.Release(tag); err != nil {
-				fmt.Println(errorStyle.Render("✗ Release error: " + err.Error()))
-				return nil
-			}
 			a.removeLock(tag)
 			fmt.Println(successStyle.Render("✓ Released: ") + lockTagStyle.Render(tag))
 			return nil
@@ -420,6 +410,12 @@ func (a *ctlSession) removeLock(lockTag string) {
 			return
 		}
 	}
+}
+
+func (a *ctlSession) clearLocks() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.locks = nil
 }
 
 func (a *ctlSession) isConnected() bool {

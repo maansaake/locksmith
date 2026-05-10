@@ -6,18 +6,16 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/maansaake/locksmith)](https://goreportcard.com/report/github.com/maansaake/locksmith)
 ![tag](https://img.shields.io/github/v/tag/maansaake/locksmith?label=latest%20version)
 
-- [Install](#install)
-- [How to run](#how-to-run)
-  - [The locksmith server](#the-locksmith-server)
-    - [Locksmith server environment variables](#locksmith-server-environment-variables)
-    - [Advanced configuration options](#advanced-configuration-options)
-  - [The command line utility](#the-command-line-utility)
-- [How to use the locksmith code as a library](#how-to-use-the-locksmith-code-as-a-library)
-- [Metrics](#metrics)
-
 Locksmith provides a simple way to obtain shared locks between applications.
 
-This project provides both server software, a command line utility, and a sample client. The protocol package can also be used to write custom client software.
+This project provides:
+
+- server implementation (binary + docker image)
+- a command line utility `locksmithctl`
+- a sample client
+- client library packages (see `/pkg`)
+
+Documentation provided [inline](https://pkg.go.dev/github.com/maansthoernvik/locksmith).
 
 ## Install
 
@@ -33,12 +31,6 @@ Run `go install` to instead get the server binary, make sure you have set either
 
 ```bash
 go install github.com/maansaake/locksmith@latest
-```
-
-The command line utility must be installed via `go install`.
-
-```bash
-go install github.com/maansaake/locksmith/cmd/locksmithctl@latest
 ```
 
 ## How to run
@@ -80,51 +72,41 @@ These options are available to enable optimizations for systems where locksmith 
 - `LOCKSMITH_Q_CONCURRENCY`: Only applicable for `multi` type queueing, sets the number of go-routines serving incoming requests (default: `10`)
 - `LOCKSMITH_Q_CAPACITY`: Only applicable for `multi` type queueing, sets the size of each serving go-routines work queue (default: `100`)
 
-### The command line utility
+### `locksmithctl`
 
-Start a new session:
-
-```bash
-locksmithctl
-Starting Locksmith shell...
-CONNECTED: localhost:9000
-
-Session started, the following commands are supported:
-
-acquire [lock]
-release [lock]
-> 
-```
-
-The utility accepts the following flags:
-
-- `--host`: Locksmith hostname or IP address (default: `localhost`)
-- `--port`: Locksmith port number (default: `9000`)
-- `--cert`: Absolute path to a PEM encoded client certificate (for mTLS)
-- `--private-key`: Absolute path to a PEM encoded client private key (for mTLS)
-- `--ca-cert`: Absolute path to a PEM encoded CA certificate used to verify the server certificate
-
-Acquire a lock:
+The command line utility must be installed via `go install`.
 
 ```bash
-> acquire 123
-acquired  123
+go install github.com/maansaake/locksmith/cmd/locksmithctl@latest
 ```
 
-Acquire it again (locksmith closes the connection due to bad behavior):
+User guidance is provided as part of the CLI's UX:
 
-```bash
-> acquire 123
-Timed out waiting for acquired signal
+```text
+╭──────────────────────────────────────╮
+│  🔑 locksmithctl                     │
+│  Interactive Locksmith Lock Manager  │
+│  Connecting to localhost:9000        │
+╰──────────────────────────────────────╯
+✓ Connected to localhost:9000
+
+Commands
+  acquire [lock]          Acquire a lock (interactive prompt if omitted)
+  release [lock]          Release a lock (picker if omitted)
+  list                    Show all acquired locks
+  reconnect               Reconnect to the server
+  help                    Show this help
+  exit / quit             Exit locksmithctl
+
+locksmith> acquire locktag
+→ Acquire request sent for locktag  (waiting for server acknowledgement…)
+✓ Acquired: locktag
+locksmith> list
+╭──────────────────╮
+│ Active Locks (1) │
+│    1.  locktag   │
+╰──────────────────╯
 ```
-
-Exit the shell:
-
-```bash
-> exit
-```
-
-The command line utility is simple and mainly useful for testing connections.
 
 ## How to use the locksmith code as a library
 
