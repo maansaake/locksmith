@@ -25,8 +25,8 @@ jobs:
 
           find . -type f -name "*.go" -exec sha256sum {} \; > gosum.txt
           sha256sum modsum.txt gosum.txt > totalmodsum.txt
-          sha256sum totalmodsum.txt > totalmodsum.txt
-          echo "checksum=$(cat totalmodsum.txt | awk '{print $1}')" >> $GITHUB_OUTPUT
+          md5sum totalmodsum.txt > md5.txt
+          echo "checksum=$(cat md5.txt | awk '{print $1}')" >> $GITHUB_OUTPUT
 
       # Use restore-keys to always use a cache that was created with the same
       # prefix.

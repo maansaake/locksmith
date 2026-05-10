@@ -41,6 +41,7 @@ type (
 	}
 )
 
+// New creates a new Client with the given options.
 func New(options *Opts) Client {
 	return &clientImpl{
 		host:       options.Host,
@@ -91,6 +92,7 @@ func (c *clientImpl) Connect() error {
 	return nil
 }
 
+// handleConnection reads from the connection and handles messages until the connection is closed.
 func (c *clientImpl) handleConnection() {
 	const bufSize = 256
 
@@ -129,6 +131,7 @@ func (c *clientImpl) handleConnection() {
 	c.running = false
 }
 
+// handleBuf decodes messages from the buffer and handles them until there are no more complete messages to decode.
 func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
 	const minMsgSize = 3
 
@@ -168,6 +171,7 @@ func (c *clientImpl) handleBuf(buf *bytes.Buffer) error {
 	}
 }
 
+// handleMsg handles a single message from the server, calling the appropriate callback if needed.
 func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
 	switch msg.Type {
 	case protocol.Acquired:
