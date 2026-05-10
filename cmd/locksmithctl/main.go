@@ -167,6 +167,10 @@ func (a *lockApp) run() error {
 }
 
 func (a *lockApp) handleCommand(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+
 	switch args[0] {
 	case "exit", "quit":
 		return errExit
