@@ -121,7 +121,12 @@ func (a *lockApp) runREPL() {
 	// liner's terminal-support detection fails and Prompt() returns io.EOF
 	// immediately.  Opening /dev/tty directly gives liner access to the actual
 	// controlling terminal regardless of how stdin is connected.
-	if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0600); err == nil {
+	//
+	// os.Stdin is restored immediately after liner.NewLiner() captures its
+	// internal reader — the reassignment window is a few nanoseconds and no
+	// concurrent goroutine reads os.Stdin (the client goroutine reads from the
+	// TCP connection; the signal handler reads from a channel).
+	if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
 		orig := os.Stdin
 		os.Stdin = tty
 		defer func() {
