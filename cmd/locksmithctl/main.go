@@ -71,7 +71,7 @@ func startApp() error {
 		return fmt.Errorf("TLS config error: %w", err)
 	}
 
-	app := newLockApp(host, uint16(portNum), tlsConfig) //nolint:gosec // validated by ParseUint with bitSize 16
+	app := newCTLSession(host, uint16(portNum), tlsConfig) //nolint:gosec // validated by ParseUint with bitSize 16
 	return app.run()
 }
 

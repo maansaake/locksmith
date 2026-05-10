@@ -17,8 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// lockApp holds all runtime state for the interactive CLI session.
-type lockApp struct {
+// ctlSession holds all runtime state for the interactive CLI session.
+type ctlSession struct {
 	mu         sync.Mutex
 	locks      []string
 	c          client.Client
@@ -33,16 +33,16 @@ type lockApp struct {
 	line *liner.State
 }
 
-func newLockApp(host string, port uint16, tlsConfig *tls.Config) *lockApp {
-	return &lockApp{host: host, port: port, tlsConfig: tlsConfig}
+func newCTLSession(host string, port uint16, tlsConfig *tls.Config) *ctlSession {
+	return &ctlSession{host: host, port: port, tlsConfig: tlsConfig}
 }
 
-func (a *lockApp) addr() string {
+func (a *ctlSession) addr() string {
 	return net.JoinHostPort(a.host, strconv.Itoa(int(a.port)))
 }
 
 // run connects to Locksmith and starts the interactive REPL.
-func (a *lockApp) run() error {
+func (a *ctlSession) run() error {
 	fmt.Println(renderBanner(a.addr()))
 
 	a.c = client.New(&client.Opts{
@@ -103,7 +103,7 @@ func (a *lockApp) run() error {
 
 // reprintPrompt re-draws the prompt after an async notification.
 // It is safe to call from any goroutine; it only prints if liner is active.
-func (a *lockApp) reprintPrompt() {
+func (a *ctlSession) reprintPrompt() {
 	a.mu.Lock()
 	l := a.line
 	a.mu.Unlock()
@@ -115,7 +115,30 @@ func (a *lockApp) reprintPrompt() {
 // runREPL is the main input loop.  It uses liner for readline-style editing,
 // command history, and tab completion.  Each typed line is dispatched through
 // a cobra command tree so every command benefits from cobra's argument handling.
+<<<<<<< Updated upstream
 func (a *lockApp) runREPL() {
+=======
+func (a *ctlSession) runREPL() {
+	// liner.NewLiner() reads from os.Stdin.  When stdin is redirected (e.g.
+	// inside a Docker container without -t, through a pipe, or in some IDEs),
+	// liner's terminal-support detection fails and Prompt() returns io.EOF
+	// immediately.  Opening /dev/tty directly gives liner access to the actual
+	// controlling terminal regardless of how stdin is connected.
+	//
+	// os.Stdin is restored immediately after liner.NewLiner() captures its
+	// internal reader — the reassignment window is a few nanoseconds and no
+	// concurrent goroutine reads os.Stdin (the client goroutine reads from the
+	// TCP connection; the signal handler reads from a channel).
+	if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
+		orig := os.Stdin
+		os.Stdin = tty
+		defer func() {
+			os.Stdin = orig
+			tty.Close()
+		}()
+	}
+
+>>>>>>> Stashed changes
 	l := liner.NewLiner()
 	l.SetCtrlCAborts(true)
 
@@ -171,7 +194,7 @@ func (a *lockApp) runREPL() {
 // setupCompletion registers liner's tab-completion function.
 // Completing at the start of the line offers command names; completing after
 // "release " offers the names of currently-held locks.
-func (a *lockApp) setupCompletion(l *liner.State) {
+func (a *ctlSession) setupCompletion(l *liner.State) {
 	topLevel := []string{"acquire ", "release ", "list", "reconnect", "help", "exit", "quit"}
 
 	l.SetCompleter(func(line string) []string {
@@ -203,7 +226,7 @@ func (a *lockApp) setupCompletion(l *liner.State) {
 
 // buildCobra constructs the cobra command tree used inside the REPL.
 // A fresh tree is built once and reused for every REPL iteration.
-func (a *lockApp) buildCobra() *cobra.Command {
+func (a *ctlSession) buildCobra() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "locksmithctl",
 		SilenceErrors: true,
@@ -231,7 +254,7 @@ func (a *lockApp) buildCobra() *cobra.Command {
 // Command definitions
 // ---------------------------------------------------------------------------
 
-func (a *lockApp) acquireCmd() *cobra.Command {
+func (a *ctlSession) acquireCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "acquire [lock]",
 		Short: "Acquire a lock",
@@ -277,7 +300,7 @@ func (a *lockApp) acquireCmd() *cobra.Command {
 	}
 }
 
-func (a *lockApp) releaseCmd() *cobra.Command {
+func (a *ctlSession) releaseCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "release [lock]",
 		Short: "Release a lock",
@@ -324,7 +347,7 @@ func (a *lockApp) releaseCmd() *cobra.Command {
 	}
 }
 
-func (a *lockApp) listCmd() *cobra.Command {
+func (a *ctlSession) listCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all acquired locks",
@@ -339,7 +362,7 @@ func (a *lockApp) listCmd() *cobra.Command {
 	}
 }
 
-func (a *lockApp) reconnectCmd() *cobra.Command {
+func (a *ctlSession) reconnectCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "reconnect",
 		Short: "Reconnect to the Locksmith server",
@@ -359,7 +382,7 @@ func (a *lockApp) reconnectCmd() *cobra.Command {
 	}
 }
 
-func (a *lockApp) exitCmd() *cobra.Command {
+func (a *ctlSession) exitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "exit",
 		Aliases: []string{"quit"},
@@ -374,7 +397,7 @@ func (a *lockApp) exitCmd() *cobra.Command {
 // Thread-safe state helpers
 // ---------------------------------------------------------------------------
 
-func (a *lockApp) getLocks() []string {
+func (a *ctlSession) getLocks() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	result := make([]string, len(a.locks))
@@ -382,13 +405,13 @@ func (a *lockApp) getLocks() []string {
 	return result
 }
 
-func (a *lockApp) addLock(lockTag string) {
+func (a *ctlSession) addLock(lockTag string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.locks = append(a.locks, lockTag)
 }
 
-func (a *lockApp) removeLock(lockTag string) {
+func (a *ctlSession) removeLock(lockTag string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for i, l := range a.locks {
@@ -399,13 +422,13 @@ func (a *lockApp) removeLock(lockTag string) {
 	}
 }
 
-func (a *lockApp) isConnected() bool {
+func (a *ctlSession) isConnected() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.connected
 }
 
-func (a *lockApp) setConnected(v bool) {
+func (a *ctlSession) setConnected(v bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.connected = v

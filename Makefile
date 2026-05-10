@@ -71,3 +71,6 @@ run-docker: build-image
 		-e LOCKSMITH_PORT=${LOCKSMITH_PORT} \
 		--name locksmith \
 		github.com/maansaake/locksmith:local
+
+runctl: buildctl
+	./build/${CTL_BIN_NAME}

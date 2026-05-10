@@ -58,7 +58,7 @@ func promptStr() string {
 
 // renderBanner renders the startup banner box.
 func renderBanner(addr string) string {
-	content := titleStyle.Render("🔑  locksmithctl") + "\n" +
+	content := titleStyle.Render("🔑 locksmithctl") + "\n" +
 		mutedStyle.Render("Interactive Locksmith Lock Manager") + "\n" +
 		infoStyle.Render("Connecting to "+addr)
 	return bannerStyle.Render(content)
