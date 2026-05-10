@@ -2,6 +2,8 @@ LOCKSMITH_PORT ?= 9000
 LOCKSMITH_METRICS_PORT ?= 9464
 LOCKSMITH_OBSERVABILITY ?= true
 
+CTL_BIN_NAME ?= locksmithctl
+
 .PHONY: build
 build:
 	mkdir -p build
@@ -13,6 +15,10 @@ build-image:
 buildctl:
 	mkdir -p build
 	go build -o build/locksmithctl ./cmd/locksmithctl
+
+buildctl-release:
+	mkdir -p build
+	go build -trimpath -ldflags="-s -w" -o build/${CTL_BIN_NAME} ./cmd/locksmithctl
 
 lint:
 	golangci-lint run --fix

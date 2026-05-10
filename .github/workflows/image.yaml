@@ -1,4 +1,4 @@
-name: Image
+name: Build image
 
 run-name: "Build image: ${{ inputs.version || github.ref_name }}"
 

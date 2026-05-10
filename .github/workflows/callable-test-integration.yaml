@@ -1,4 +1,4 @@
-name: Unit test
+name: Integration test
 
 on:
   workflow_call:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  integrations-test:
+  integration-test:
     env:
       VERSION: ${{ inputs.version }}
     runs-on: ubuntu-latest
