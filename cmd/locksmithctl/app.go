@@ -116,6 +116,20 @@ func (a *lockApp) reprintPrompt() {
 // command history, and tab completion.  Each typed line is dispatched through
 // a cobra command tree so every command benefits from cobra's argument handling.
 func (a *lockApp) runREPL() {
+	// liner.NewLiner() reads from os.Stdin.  When stdin is redirected (e.g.
+	// inside a Docker container without -t, through a pipe, or in some IDEs),
+	// liner's terminal-support detection fails and Prompt() returns io.EOF
+	// immediately.  Opening /dev/tty directly gives liner access to the actual
+	// controlling terminal regardless of how stdin is connected.
+	if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0600); err == nil {
+		orig := os.Stdin
+		os.Stdin = tty
+		defer func() {
+			os.Stdin = orig
+			tty.Close()
+		}()
+	}
+
 	l := liner.NewLiner()
 	l.SetCtrlCAborts(true)
 
