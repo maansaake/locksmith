@@ -21,7 +21,7 @@ jobs:
     secrets: inherit
 
   image:
-    uses: ./.github/workflows/image.yaml
+    uses: ./.github/workflows/callable-image.yaml
     secrets: inherit
     with:
       push: true

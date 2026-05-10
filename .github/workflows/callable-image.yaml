@@ -59,3 +59,5 @@ jobs:
             COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=locksmith
+          cache-to: type=gha,scope=locksmith,mode=max
