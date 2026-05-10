@@ -32,7 +32,7 @@ docker pull ghcr.io/maansaake/locksmith:latest
 Run `go install` to instead get the server binary, make sure you have set either `GOPATH` or `GOBIN`.
 
 ```bash
-go install github.com/maansaake/locksmith/cmd/locksmith@latest
+go install github.com/maansaake/locksmith@latest
 ```
 
 The command line utility must be installed via `go install`.
@@ -166,22 +166,28 @@ Or use the protocol package directly to write your own client. See the `ClientMe
 
 ## Metrics
 
-Locksmith uses [OpenTelemetry](https://opentelemetry.io/) for instrumentation. When `LOCKSMITH_OBSERVABILITY` is set to `true`, the OTEL SDK is initialized and metrics are exported via the [autoexport](https://pkg.go.dev/go.opentelemetry.io/contrib/exporters/autoexport) package, which picks the exporter based on standard OTEL environment variables (e.g. `OTEL_EXPORTER_OTLP_ENDPOINT` for OTLP, or `OTEL_METRICS_EXPORTER=prometheus` for Prometheus).
+Locksmith uses [OpenTelemetry](https://opentelemetry.io/) for instrumentation. When `LOCKSMITH_OBSERVABILITY` is set to `true`, the OTEL SDK is initialized and the [autoexport](https://pkg.go.dev/go.opentelemetry.io/contrib/exporters/autoexport) package is used to select the metrics exporter based on standard OTEL environment variables. By default the OTLP exporter is used; set `OTEL_METRICS_EXPORTER` to change this (e.g. `prometheus`, `console`, or `none`). See the [OTEL SDK environment variable specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/) and the [OTLP exporter configuration reference](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/) for the full list of supported variables.
 
-Locksmith records the following metrics:
+Locksmith registers the following OTEL instruments:
 
-- `locksmith.locks`: UpDownCounter tracking the number of currently held locks
-- `locksmith.acquires`: Counter tracking the total number of successful lock acquires since start
-- `locksmith.releases`: Counter tracking the total number of successful lock releases since start
-- `locksmith.rejections`: Counter tracking rejections due to client misbehavior, with a `reason` attribute set to one of: `bad_manners`, `unnecessary_acquire`, or `unnecessary_release`
+| Instrument | Type | Description |
+|---|---|---|
+| `locksmith.locks` | UpDownCounter | Number of currently held locks |
+| `locksmith.acquires` | Counter | Total successful lock acquires since start |
+| `locksmith.releases` | Counter | Total successful lock releases since start |
+| `locksmith.rejections` | Counter | Rejections due to client misbehavior; carries a `reason` attribute (`bad_manners`, `unnecessary_acquire`, or `unnecessary_release`) |
 
-When `LOCKSMITH_RUNTIME_METRICS` is `true` (the default), the following Go runtime metrics are also exported:
+When `LOCKSMITH_RUNTIME_METRICS` is `true` (the default), the following Go runtime instruments from the [OTEL Go runtime semconv](https://opentelemetry.io/docs/specs/semconv/runtime/go-metrics/) are also recorded:
 
-- `go.memory.used`: Memory used by the Go runtime (bytes)
-- `go.memory.limit`: Go runtime memory limit, if configured (bytes)
-- `go.memory.allocated`: Memory allocated to the heap by the application (bytes)
-- `go.memory.allocations`: Count of allocations to the heap
-- `go.memory.gc.goal`: Heap size target for the end of the GC cycle (bytes)
-- `go.goroutine.count`: Count of live goroutines
-- `go.processor.limit`: Number of OS threads that can execute user-level Go code simultaneously
-- `go.config.gogc`: Heap size target percentage configured by the user
+| Instrument | Unit | Description |
+|---|---|---|
+| `go.memory.used` | By | Memory used by the Go runtime |
+| `go.memory.limit` | By | Go runtime memory limit, if configured |
+| `go.memory.allocated` | By | Memory allocated to the heap |
+| `go.memory.allocations` | {allocation} | Count of heap allocations |
+| `go.memory.gc.goal` | By | Heap size target at end of GC cycle |
+| `go.goroutine.count` | {goroutine} | Number of live goroutines |
+| `go.processor.limit` | {thread} | OS threads available for user-level Go code |
+| `go.config.gogc` | % | Heap size target percentage (GOGC) |
+
+> **Note:** the instrument names above are the OTEL API names. The exact metric names seen in your monitoring system depend on the exporter. For example, the Prometheus exporter converts dots to underscores and appends `_total` to counters (`locksmith.acquires` → `locksmith_acquires_total`), while the OTLP exporter preserves the dot notation.
