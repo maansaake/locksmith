@@ -37,7 +37,7 @@ func main() {
 		},
 	}
 
-	rootCmd.Flags().StringVar(&address, "address", "localhost:9090", "Locksmith server address (host:port).")
+	rootCmd.Flags().StringVar(&address, "address", "localhost:9000", "Locksmith server address (host:port).")
 	rootCmd.Flags().StringVar(&clientCertPath, "cert", "", "Absolute path to a PEM encoded certificate.")
 	rootCmd.Flags().StringVar(&clientPrivateKeyPath, "private-key", "", "Absolute path to a PEM encoded private key.")
 	rootCmd.Flags().StringVar(
