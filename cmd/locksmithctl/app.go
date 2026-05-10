@@ -70,12 +70,20 @@ func (a *lockApp) run() error {
 	})
 
 	if err := a.c.Connect(); err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", a.addr(), err)
+		// Connection failure is non-fatal: show an error and drop into the REPL
+		// so the user can type 'reconnect' once the server becomes available.
+		fmt.Println(warnBoxStyle.Render(
+			warnStyle.Render("⚠  Could not connect to "+a.addr()) + "\n" +
+				mutedStyle.Render(err.Error()) + "\n" +
+				mutedStyle.Render("Type 'reconnect' to try again"),
+		))
+		fmt.Println()
+	} else {
+		a.setConnected(true)
+		fmt.Println(successStyle.Render("✓ Connected to ") + infoStyle.Render(a.addr()))
+		fmt.Println()
 	}
-	a.setConnected(true)
 
-	fmt.Println(successStyle.Render("✓ Connected to ") + infoStyle.Render(a.addr()))
-	fmt.Println()
 	printHelp()
 	fmt.Println()
 

@@ -191,7 +191,9 @@ func (c *clientImpl) handleMsg(msg *protocol.ClientMessage) {
 // Close disconnects from the Locksmith instance. Safe to call multiple times.
 func (c *clientImpl) Close() {
 	c.stopped = true
-	_ = c.conn.Close()
+	if c.conn != nil {
+		_ = c.conn.Close()
+	}
 }
 
 // Acquire the given lock tag.
