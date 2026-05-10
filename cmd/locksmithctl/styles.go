@@ -69,10 +69,9 @@ func renderLockList(locks []string) string {
 	var sb strings.Builder
 	sb.WriteString(lockTagStyle.Render(fmt.Sprintf("Active Locks (%d)", len(locks))))
 	for i, l := range locks {
-		sb.WriteString(fmt.Sprintf("\n  %s  %s",
+		fmt.Fprintf(&sb, "\n  %s  %s",
 			mutedStyle.Render(fmt.Sprintf("%2d.", i+1)),
-			l,
-		))
+			l)
 	}
 	return lockBoxStyle.Render(sb.String())
 }
@@ -89,12 +88,12 @@ func renderDisconnectWarning() string {
 func printHelp() {
 	type row struct{ cmd, desc string }
 	rows := []row{
-		{"acquire [lock]", "Acquire a lock (interactive prompt if omitted)"},
-		{"release [lock]", "Release a lock (picker if omitted)"},
-		{"list", "Show all acquired locks"},
-		{"reconnect", "Reconnect to the server"},
-		{"help", "Show this help"},
-		{"exit / quit", "Exit locksmithctl"},
+		{cmdAcquire + " [lock]", "Acquire a lock (interactive prompt if omitted)"},
+		{cmdRelease + " [lock]", "Release a lock (picker if omitted)"},
+		{cmdList, "Show all acquired locks"},
+		{cmdReconnect, "Reconnect to the server"},
+		{cmdHelp, "Show this help"},
+		{cmdExit + " / " + cmdQuit, "Exit locksmithctl"},
 	}
 	var sb strings.Builder
 	sb.WriteString(titleStyle.Render("Commands") + "\n")

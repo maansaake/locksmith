@@ -17,6 +17,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	cmdHelp      = "help"
+	cmdList      = "list"
+	cmdAcquire   = "acquire"
+	cmdRelease   = "release"
+	cmdReconnect = "reconnect"
+	cmdExit      = "exit"
+	cmdQuit      = "quit"
+)
+
 // ctlSession holds all runtime state for the interactive CLI session.
 type ctlSession struct {
 	mu         sync.Mutex
@@ -168,7 +178,7 @@ func (a *ctlSession) runREPL() {
 // Completing at the start of the line offers command names; completing after
 // "release " offers the names of currently-held locks.
 func (a *ctlSession) setupCompletion(l *liner.State) {
-	topLevel := []string{"acquire ", "release ", "list", "reconnect", "help", "exit", "quit"}
+	topLevel := []string{cmdAcquire + " ", cmdRelease + " ", cmdList, cmdReconnect, cmdHelp, cmdExit, cmdQuit}
 
 	l.SetCompleter(func(line string) []string {
 		var completions []string
@@ -184,8 +194,8 @@ func (a *ctlSession) setupCompletion(l *liner.State) {
 		}
 
 		// Complete "release <lock>" with currently-held lock tags.
-		if strings.HasPrefix(line, "release ") {
-			prefix := strings.TrimPrefix(line, "release ")
+		if after, ok := strings.CutPrefix(line, "release "); ok {
+			prefix := after
 			for _, lock := range a.getLocks() {
 				if strings.HasPrefix(lock, prefix) {
 					completions = append(completions, "release "+lock)
@@ -229,7 +239,7 @@ func (a *ctlSession) buildCobra() *cobra.Command {
 
 func (a *ctlSession) acquireCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "acquire [lock]",
+		Use:   cmdAcquire + " [lock]",
 		Short: "Acquire a lock",
 		RunE: func(_ *cobra.Command, args []string) error {
 			if !a.isConnected() {
@@ -284,7 +294,7 @@ func (a *ctlSession) acquireCmd() *cobra.Command {
 
 func (a *ctlSession) releaseCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "release [lock]",
+		Use:   cmdRelease + " [lock]",
 		Short: "Release a lock",
 		RunE: func(_ *cobra.Command, args []string) error {
 			if !a.isConnected() {
@@ -339,7 +349,7 @@ func (a *ctlSession) releaseCmd() *cobra.Command {
 
 func (a *ctlSession) listCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
+		Use:   cmdList,
 		Short: "List all acquired locks",
 		Run: func(_ *cobra.Command, _ []string) {
 			locks := a.getLocks()
@@ -354,7 +364,7 @@ func (a *ctlSession) listCmd() *cobra.Command {
 
 func (a *ctlSession) reconnectCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "reconnect",
+		Use:   cmdReconnect,
 		Short: "Reconnect to the Locksmith server",
 		Run: func(_ *cobra.Command, _ []string) {
 			if a.isConnected() {
@@ -374,8 +384,8 @@ func (a *ctlSession) reconnectCmd() *cobra.Command {
 
 func (a *ctlSession) exitCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "exit",
-		Aliases: []string{"quit"},
+		Use:     cmdExit,
+		Aliases: []string{cmdQuit},
 		Short:   "Exit locksmithctl",
 		Run: func(_ *cobra.Command, _ []string) {
 			a.shouldExit = true
