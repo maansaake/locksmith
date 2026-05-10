@@ -40,7 +40,8 @@ jobs:
           restore-keys: unit-test-
 
       - name: Run tests
-        run: go test ./... -v -failfast -coverprofile=coverage.out
+        run: |
+          make unit-test-cover
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.out -o coverage.html

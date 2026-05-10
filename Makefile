@@ -21,8 +21,10 @@ govulncheck:
 	go tool -modfile tools/go.mod govulncheck ./...
 
 unit-test:
-	go test ./pkg/... -failfast
-	go test ./internal/... -failfast
+	go test ./pkg/... ./internal/... -failfast
+
+unit-test-cover:
+	go test ./pkg/... ./internal/... -failfast -coverprofile=coverage.out
 
 integration-test:
 	go test ./test/integration/... -failfast -count=1 -v
