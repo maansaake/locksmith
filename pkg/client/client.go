@@ -23,18 +23,20 @@ type (
 	}
 	// Opts to provide at client instantiation.
 	Opts struct {
-		Host       string
-		Port       uint16
-		TLSConfig  *tls.Config
-		OnAcquired func(lockTag string)
+		Host           string
+		Port           uint16
+		TLSConfig      *tls.Config
+		OnAcquired     func(lockTag string)
+		OnDisconnected func()
 	}
 	// Implements the Client interface.
 	clientImpl struct {
-		host       string
-		port       uint16
-		tlsConfig  *tls.Config
-		onAcquired func(lockTag string)
-		conn       net.Conn
+		host           string
+		port           uint16
+		tlsConfig      *tls.Config
+		onAcquired     func(lockTag string)
+		onDisconnected func()
+		conn           net.Conn
 
 		running bool
 		stopped bool
@@ -44,10 +46,11 @@ type (
 // New creates a new Client with the given options.
 func New(options *Opts) Client {
 	return &clientImpl{
-		host:       options.Host,
-		port:       options.Port,
-		tlsConfig:  options.TLSConfig,
-		onAcquired: options.OnAcquired,
+		host:           options.Host,
+		port:           options.Port,
+		tlsConfig:      options.TLSConfig,
+		onAcquired:     options.OnAcquired,
+		onDisconnected: options.OnDisconnected,
 
 		running: false,
 		stopped: false,
@@ -129,6 +132,10 @@ func (c *clientImpl) handleConnection() {
 	}
 
 	c.running = false
+
+	if !c.stopped && c.onDisconnected != nil {
+		c.onDisconnected()
+	}
 }
 
 // handleBuf decodes messages from the buffer and handles them until there are no more complete messages to decode.
