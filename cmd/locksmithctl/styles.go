@@ -48,12 +48,12 @@ var (
 			Padding(0, 1)
 )
 
-// promptStr returns the styled REPL prompt.
-// The ANSI sequences are intentionally included so the prompt is coloured; liner may
-// slightly mis-calculate cursor position on very long lines but this is acceptable.
+// promptStr returns the REPL prompt string.
+// This must be plain text with no ANSI escape sequences: liner validates every
+// rune in the prompt and returns ErrInvalidPrompt (breaking the REPL loop) the
+// moment it encounters any control character such as ESC (\x1b).
 func promptStr() string {
-	return lipgloss.NewStyle().Bold(true).Foreground(colorBrand).Render("locksmith") +
-		lipgloss.NewStyle().Foreground(colorMuted).Render("> ")
+	return "locksmith> "
 }
 
 // renderBanner renders the startup banner box.
