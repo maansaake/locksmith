@@ -23,4 +23,4 @@ go.work
 
 # Build output
 build/
-locksmithctl
+/locksmithctl
