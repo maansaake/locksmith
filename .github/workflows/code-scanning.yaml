@@ -1,6 +1,6 @@
 name: Code scanning
 
-run-name: "Scanning: ${{ github.event.pull_request.number || github.event.head_commit.message }}"
+run-name: "Scanning: ${{ github.event.pull_request.number || github.event.head_commit.id || github.sha }}"
 
 on:
   push:
