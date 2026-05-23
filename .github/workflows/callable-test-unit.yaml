@@ -31,14 +31,14 @@ jobs:
 
       - name: Restore Go module cache
         id: go-mod-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         id: go-build-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/.cache/go-build
           key: unit-test-${{ steps.checksum.outputs.checksum }}
@@ -51,14 +51,14 @@ jobs:
 
       - name: Save Go module cache
         if: steps.go-mod-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ hashFiles('go.sum') }}
 
       - name: Save Go build cache
         if: steps.go-build-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/.cache/go-build
           key: unit-test-${{ steps.checksum.outputs.checksum }}
