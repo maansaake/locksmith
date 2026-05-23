@@ -30,3 +30,8 @@ jobs:
     needs: image
     uses: ./.github/workflows/callable-test-integration.yaml
     secrets: inherit
+
+  load-test:
+    needs: image
+    uses: ./.github/workflows/callable-test-load.yaml
+    secrets: inherit

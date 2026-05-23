@@ -41,6 +41,7 @@ func TestMetrics(t *testing.T) {
 	// Release a lock that was never acquired to hit rejectionCounter.
 	c2, _ := newClient(t)
 	if err := c2.Release("metric-rejection-lock"); err != nil {
+		// This looks confusing but is correct. Locksmith will kill this connection, but the TCP write will succeed first.
 		t.Fatalf("rejection trigger: %v", err)
 	}
 
