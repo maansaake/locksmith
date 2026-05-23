@@ -3,6 +3,8 @@ LOCKSMITH_METRICS_PORT ?= 9464
 LOCKSMITH_OBSERVABILITY ?= true
 
 CTL_BIN_NAME ?= locksmithctl
+GOPATH ?= $(shell go env GOPATH)
+GOBIN ?= $(GOPATH)/bin
 
 .PHONY: build
 build:
@@ -24,7 +26,7 @@ lint:
 	golangci-lint run --fix
 
 install-lint:
-	curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.12.2
+	curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOBIN) v2.12.2
 
 govulncheck:
 	go tool -modfile tools/go.mod govulncheck ./...
