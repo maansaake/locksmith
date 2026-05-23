@@ -12,7 +12,7 @@ build:
 	go build -o build/locksmith
 
 build-image:
-	docker build -t github.com/maansaake/locksmith:local .
+	docker build -t ghcr.io/maansaake/locksmith:local .
 
 buildctl:
 	mkdir -p build
@@ -72,10 +72,16 @@ run: build
 
 run-docker: build-image
 	docker run -d \
+		-p ${LOCKSMITH_METRICS_PORT}:${LOCKSMITH_METRICS_PORT} \
 		-p ${LOCKSMITH_PORT}:${LOCKSMITH_PORT} \
 		-e LOCKSMITH_PORT=${LOCKSMITH_PORT} \
+		-e LOCKSMITH_OBSERVABILITY=${LOCKSMITH_OBSERVABILITY} \
+		-e OTEL_METRICS_EXPORTER=prometheus \
+		-e OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0 \
+		-e OTEL_EXPORTER_PROMETHEUS_PORT=${LOCKSMITH_METRICS_PORT} \
+		--rm \
 		--name locksmith \
-		github.com/maansaake/locksmith:local
+		ghcr.io/maansaake/locksmith:local
 
 runctl: buildctl
 	./build/${CTL_BIN_NAME}
