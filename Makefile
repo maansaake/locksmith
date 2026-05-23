@@ -1,6 +1,8 @@
+LOCKSMITH_HOST ?= localhost
 LOCKSMITH_PORT ?= 9000
 LOCKSMITH_METRICS_PORT ?= 9464
 LOCKSMITH_OBSERVABILITY ?= true
+LOAD_TEST_DURATION ?= 60s
 
 CTL_BIN_NAME ?= locksmithctl
 GOPATH ?= $(shell go env GOPATH)
@@ -43,6 +45,18 @@ integration-test:
 integration-test-json:
 	mkdir -p build
 	go test ./test/integration/... -failfast -count=1 -v -json > build/integration-test-output.json
+
+load-test:
+	rm -rf build/load-test
+	mkdir -p build/load-test
+	go run ./test/load cli \
+		--duration ${LOAD_TEST_DURATION} \
+		--report-path build/load-test/report.yaml \
+		--locksmith-load.host ${LOCKSMITH_HOST} \
+		--locksmith-load.port ${LOCKSMITH_PORT}
+	go run ./test/load/validate \
+		-error-log build/load-test/error.log \
+		-report build/load-test/report.yaml
 
 compose:
 	LOCKSMITH_PORT=${LOCKSMITH_PORT} \
