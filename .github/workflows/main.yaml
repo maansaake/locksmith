@@ -1,6 +1,6 @@
 name: Main branch protection
 
-run-name: "Main branch protection: ${{ format('{0} #{1}', github.ref_name, github.run_number) }}"
+run-name: "Main branch protection: ${{ github.run_number }}"
 
 on:
   push:
