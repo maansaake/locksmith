@@ -27,9 +27,24 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh pr list --repo "${{ github.repository }}" --base main --state open --json number \
-            --jq '.[].number' | \
-          while read -r pr; do
-            echo "Checking PR #$pr..."
-            gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
+          gh pr list --repo "${{ github.repository }}" --base main --state open --json number,author \
+            --jq '.[] | "\(.number) \(.author.login)"' | \
+          while IFS=' ' read -r pr author; do
+            echo "Checking PR #$pr (author: $author)..."
+            if [ "$author" = "dependabot[bot]" ]; then
+              # Trigger Dependabot to rebase its own branch rather than pushing directly with
+              # the Jeeves bot token. If Jeeves pushes, dependabot/fetch-metadata fails with
+              # "PR is not from Dependabot" on the resulting synchronize event, which prevents
+              # Jeeves from re-approving and re-enabling auto-merge on that PR.
+              merge_state=$(gh pr view "$pr" --repo "${{ github.repository }}" \
+                --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo "ERROR")
+              if [ "$merge_state" = "BEHIND" ]; then
+                echo "PR #$pr is behind main, triggering Dependabot rebase"
+                gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
+              else
+                echo "PR #$pr merge state is '$merge_state', no update needed"
+              fi
+            else
+              gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
+            fi
           done
