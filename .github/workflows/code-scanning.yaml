@@ -41,10 +41,36 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version: stable
-          cache-dependency-path: tools/go.sum
+          cache: false
+
+      - name: Checksum
+        id: checksum
+        run: |
+          checksum=$(
+            {
+              sha256sum tools/go.mod tools/go.sum
+              find . -type f -name "*.go" -print0 | sort -z | xargs -0 sha256sum
+            } | sha256sum | awk '{print $1}'
+          )
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go module cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/go/pkg/mod
+          key: govulncheck-go-mod-${{ hashFiles('tools/go.sum') }}
+
+      - name: Cache Go build cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/go-build
+          key: govulncheck-go-build-${{ steps.checksum.outputs.checksum }}
+          restore-keys: |
+            govulncheck-go-build-
 
       - name: Run govulncheck
         run: go tool -modfile tools/go.mod govulncheck -format sarif ./... > results.sarif
+
 
       - name: Upload SARIF report
         if: always()

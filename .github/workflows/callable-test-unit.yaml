@@ -29,20 +29,24 @@ jobs:
           )
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
-      # Use restore-keys to always use a cache that was created with the same
-      # prefix.
-      - name: Cache go modules and the buildcache
+      - name: Cache Go module cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: unit-test-${{ steps.checksum.outputs.checksum }}
-          restore-keys: unit-test-
+          path: ~/go/pkg/mod
+          key: unit-test-go-mod-${{ hashFiles('go.sum') }}
+
+      - name: Cache Go build cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/go-build
+          key: unit-test-go-build-${{ steps.checksum.outputs.checksum }}
+          restore-keys: |
+            unit-test-go-build-
 
       - name: Run tests
         run: |
           make unit-test-cover
+
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.out -o coverage.html
