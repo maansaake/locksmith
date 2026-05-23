@@ -21,12 +21,13 @@ jobs:
       - name: Checksum
         id: checksum
         run: |
-          sha256sum go.mod go.sum > modsum.txt
-
-          find . -type f -name "*.go" -exec sha256sum {} \; > gosum.txt
-          sha256sum modsum.txt gosum.txt > totalmodsum.txt
-          md5sum totalmodsum.txt > md5.txt
-          echo "checksum=$(cat md5.txt | awk '{print $1}')" >> $GITHUB_OUTPUT
+          checksum=$(
+            {
+              sha256sum go.mod go.sum
+              find . -type f -name "*.go" -print0 | sort -z | xargs -0 sha256sum
+            } | sha256sum | awk '{print $1}'
+          )
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
       # Use restore-keys to always use a cache that was created with the same
       # prefix.
