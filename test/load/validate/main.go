@@ -7,21 +7,9 @@ import (
 	"os"
 	"strings"
 
+	yamlreport "github.com/maansaake/arbiter/pkg/report/yaml"
 	"gopkg.in/yaml.v3"
 )
-
-type report struct {
-	Modules map[string]moduleReport `yaml:"modules"`
-}
-
-type moduleReport struct {
-	Operations map[string]operationReport `yaml:"operation"`
-}
-
-type operationReport struct {
-	Executions uint `yaml:"executions"`
-	NOK        uint `yaml:"nok"`
-}
 
 func main() {
 	var (
@@ -66,7 +54,7 @@ func validateReport(path string) error {
 		return fmt.Errorf("read report: %w", err)
 	}
 
-	var rep report
+	var rep yamlreport.Report
 	if err := yaml.Unmarshal(contents, &rep); err != nil {
 		return fmt.Errorf("decode report: %w", err)
 	}
