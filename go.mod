@@ -9,7 +9,7 @@ require (
 	github.com/peterh/liner v1.2.2
 	github.com/spf13/cobra v1.10.2
 	github.com/trebent/envparser v1.0.7
-	github.com/trebent/zerologr v1.0.3
+	github.com/trebent/zerologr v1.1.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.68.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.68.0
 	go.opentelemetry.io/otel v1.43.0

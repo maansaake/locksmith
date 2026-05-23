@@ -119,8 +119,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/trebent/envparser v1.0.7 h1:9ApJjbtwMqjeCb3CwvgPenkFfOh8vB/9HlWxmDr5TW8=
 github.com/trebent/envparser v1.0.7/go.mod h1:tt01YGq91TkGHfWqDWX3r1eKNWByubGzcnsp+N5uDjg=
-github.com/trebent/zerologr v1.0.3 h1:pFYxWii64qzbHqZcvV9AgDMwt6sAdMsqnRpYuxCtVwA=
-github.com/trebent/zerologr v1.0.3/go.mod h1:ceOLoPe5er9EJzylbwoSiw6j/Ssc+oYGJX8JrIVtqy4=
+github.com/trebent/zerologr v1.1.0 h1:9llmoK7P9V/byr0A2iW7DnSqsVM+bmr3fxEp5xDJIis=
+github.com/trebent/zerologr v1.1.0/go.mod h1:ceOLoPe5er9EJzylbwoSiw6j/Ssc+oYGJX8JrIVtqy4=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
