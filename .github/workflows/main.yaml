@@ -1,6 +1,6 @@
 name: Main branch protection
 
-run-name: "Main branch protection: ${{ github.event.head_commit.id || github.sha }}"
+run-name: "Main branch protection: ${{ format('{0} #{1}', github.ref_name, github.run_number) }}"
 
 on:
   push:
