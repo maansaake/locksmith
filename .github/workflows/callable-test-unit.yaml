@@ -33,15 +33,15 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/go/pkg/mod
-          key: go-mod-${{ hashFiles('go.sum') }}
+          key: unit-test-go-mod-${{ hashFiles('go.sum') }}
 
       - name: Cache Go build cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/go-build
-          key: unit-test-${{ steps.checksum.outputs.checksum }}
+          key: unit-test-go-build-${{ steps.checksum.outputs.checksum }}
           restore-keys: |
-            unit-test-
+            unit-test-go-build-
 
       - name: Run tests
         run: |

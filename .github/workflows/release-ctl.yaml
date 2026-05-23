@@ -54,15 +54,15 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/go/pkg/mod
-          key: go-mod-${{ hashFiles('go.sum') }}
+          key: release-ctl-go-mod-${{ hashFiles('go.sum') }}
 
       - name: Cache Go build cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/go-build
-          key: release-ctl-${{ matrix.goos }}-${{ matrix.goarch }}-${{ steps.checksum.outputs.checksum }}
+          key: release-ctl-go-build-${{ matrix.goos }}-${{ matrix.goarch }}-${{ steps.checksum.outputs.checksum }}
           restore-keys: |
-            release-ctl-${{ matrix.goos }}-${{ matrix.goarch }}-
+            release-ctl-go-build-${{ matrix.goos }}-${{ matrix.goarch }}-
 
       - name: Build CLI binary
         env:

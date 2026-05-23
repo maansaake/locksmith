@@ -64,9 +64,9 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/go-build
-          key: govulncheck-build-${{ steps.checksum.outputs.checksum }}
+          key: govulncheck-go-build-${{ steps.checksum.outputs.checksum }}
           restore-keys: |
-            govulncheck-build-
+            govulncheck-go-build-
 
       - name: Run govulncheck
         run: go tool -modfile tools/go.mod govulncheck -format sarif ./... > results.sarif
