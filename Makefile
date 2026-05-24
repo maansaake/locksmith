@@ -21,7 +21,7 @@ compose/down:
 compose/logs:
 	docker compose -f test/compose/compose.yaml logs
 
-compose/logs-follow:
+compose/logs/follow:
 	docker compose -f test/compose/compose.yaml logs -f
 
 compose/up:
@@ -43,7 +43,7 @@ ctl/build:
 	mkdir -p build
 	go build -o build/locksmithctl ./cmd/locksmithctl
 
-ctl/build-release:
+ctl/build/release:
 	mkdir -p build
 	go build -trimpath -ldflags="-s -w" -o build/${CTL_BIN_NAME} ./cmd/locksmithctl
 
@@ -89,14 +89,14 @@ static-analysis/lint:
 static-analysis/vulncheck:
 	go tool -modfile tools/go.mod govulncheck ./...
 
-static-analysis/vulncheck-sarif:
+static-analysis/vulncheck/sarif:
 	mkdir -p build
 	go tool -modfile tools/go.mod govulncheck -format sarif ./... > build/govulncheck-report.sarif
 
 test/integration:
 	go test ./test/integration/... -failfast -count=1 -v
 
-test/integration-json:
+test/integration/json:
 	mkdir -p build
 	go test ./test/integration/... -failfast -count=1 -v -json > build/integration-test-output.json
 
@@ -115,10 +115,10 @@ test/load:
 test/unit:
 	go test ./pkg/... ./internal/... -failfast
 
-test/unit-cover:
+test/unit/cover:
 	mkdir -p build
 	go test ./pkg/... ./internal/... -failfast -coverprofile=build/coverage.out
 
-test/unit-json:
+test/unit/json:
 	mkdir -p build
 	go test ./pkg/... ./internal/... -failfast -coverprofile=build/coverage.out -v -json > build/unit-test-output.json

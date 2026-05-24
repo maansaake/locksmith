@@ -71,7 +71,7 @@ jobs:
         run: |
           CTL_BIN_NAME=locksmithctl-${{ matrix.goos }}-${{ matrix.goarch }}
           [[ "${{ matrix.goos }}" == "windows" ]] && CTL_BIN_NAME="${CTL_BIN_NAME}.exe"
-          CTL_BIN_NAME=${CTL_BIN_NAME} make buildctl-release
+          CTL_BIN_NAME=${CTL_BIN_NAME} make ctl/build/release
 
 
       - name: Upload binary to release

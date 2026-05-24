@@ -55,7 +55,7 @@ jobs:
         run: make compose/up
 
       - name: Run integration tests
-        run: make test/integration-json
+        run: make test/integration/json
 
       - name: Publish integration test results
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
