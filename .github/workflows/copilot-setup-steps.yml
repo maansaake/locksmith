@@ -58,7 +58,7 @@ jobs:
           go mod download -modfile tools/go.mod
 
       - name: Install golangci-lint
-        run: make install-lint
+        run: make install/lint
 
       - name: Warm up govulncheck
         run: go tool -modfile tools/go.mod govulncheck -version

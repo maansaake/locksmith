@@ -52,10 +52,10 @@ jobs:
             load-test-go-build-
 
       - name: Run test environment
-        run: make compose
+        run: make compose/up
 
       - name: Run load test
-        run: make load-test
+        run: make test/load
 
       - name: Collect logs on failure
         if: failure()
@@ -73,4 +73,4 @@ jobs:
 
       - name: Teardown test environment
         if: always()
-        run: make compose-down
+        run: make compose/down
