@@ -70,7 +70,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p build
-          make compose-logs > build/integration-test.log
+          make compose/logs > build/integration-test.log
 
       - name: Upload logs
         if: failure()

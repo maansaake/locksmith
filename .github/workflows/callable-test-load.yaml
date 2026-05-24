@@ -61,7 +61,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p build/load-test
-          make compose-logs > build/load-test/compose.log
+          make compose/logs > build/load-test/compose.log
 
       - name: Upload load test artifacts
         if: always()
