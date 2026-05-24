@@ -52,10 +52,10 @@ jobs:
             integration-test-go-build-
 
       - name: Run test environment
-        run: make compose
+        run: make compose/up
 
       - name: Run integration tests
-        run: make integration-test-json
+        run: make test/integration/json
 
       - name: Publish integration test results
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
@@ -70,7 +70,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p build
-          make compose-logs > build/integration-test.log
+          make compose/logs > build/integration-test.log
 
       - name: Upload logs
         if: failure()
@@ -81,4 +81,4 @@ jobs:
 
       - name: Teardown test environment
         if: always()
-        run: make compose-down
+        run: make compose/down
