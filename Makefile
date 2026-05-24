@@ -116,6 +116,7 @@ test/unit:
 	go test ./pkg/... ./internal/... -failfast
 
 test/unit-cover:
+	mkdir -p build
 	go test ./pkg/... ./internal/... -failfast -coverprofile=build/coverage.out
 
 test/unit-json:
