@@ -31,7 +31,7 @@ jobs:
             --jq '.[] | "\(.number) \(.author.login)"' | \
           while IFS=' ' read -r pr author; do
             echo "Checking PR #$pr (author: $author)..."
-            if [ "$author" = "dependabot[bot]" ]; then
+            if [ "$author" = "app/dependabot" ]; then
               # Trigger Dependabot to rebase its own branch rather than pushing directly with
               # the Jeeves bot token. If Jeeves pushes, dependabot/fetch-metadata fails with
               # "PR is not from Dependabot" on the resulting synchronize event, which prevents
