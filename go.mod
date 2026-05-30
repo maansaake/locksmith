@@ -6,11 +6,11 @@ require (
 	github.com/charmbracelet/huh v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-logr/logr v1.4.3
-	github.com/maansaake/arbiter v0.1.0
+	github.com/maansaake/arbiter v0.1.2
 	github.com/peterh/liner v1.2.2
 	github.com/spf13/cobra v1.10.2
-	github.com/trebent/envparser v1.0.7
-	github.com/trebent/zerologr v1.1.0
+	github.com/trebent/envparser v1.0.8
+	github.com/trebent/zerologr v1.1.1
 	go.opentelemetry.io/contrib/exporters/autoexport v0.69.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.69.0
 	go.opentelemetry.io/otel v1.44.0
