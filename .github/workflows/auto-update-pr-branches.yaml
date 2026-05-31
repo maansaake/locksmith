@@ -41,6 +41,9 @@ jobs:
               if [ "$merge_state" = "BEHIND" ]; then
                 echo "PR #$pr is behind main, triggering Dependabot rebase"
                 gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
+              elif [ "$merge_state" = "UNKNOWN" ]; then
+                echo "PR #$pr state UNKNOWN, triggering Dependabot rebase anyway to be safe"
+                gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
               else
                 echo "PR #$pr merge state is '$merge_state', no update needed"
               fi
