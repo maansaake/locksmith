@@ -26,29 +26,25 @@ jobs:
       - name: Update out-of-date PR branches
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEPENDABOT_REBASE_TOKEN: ${{ secrets.DEPENDABOT_REBASE_TOKEN }}
+          UPDATE_BRANCH_TOKEN: ${{ github.token }}
         run: |
           gh pr list --repo "${{ github.repository }}" --base main --state open --json number,author \
             --jq '.[] | "\(.number) \(.author.login)"' | \
           while IFS=' ' read -r pr author; do
             echo "Checking PR #$pr (author: $author)..."
             if [ "$author" = "app/dependabot" ]; then
-              # Trigger Dependabot to rebase its own branch rather than pushing directly with
-              # the Jeeves bot token. If Jeeves pushes, dependabot/fetch-metadata fails with
-              # "PR is not from Dependabot" on the resulting synchronize event, which prevents
-              # Jeeves from re-approving and re-enabling auto-merge on that PR.
+              # Use github.token (github-actions[bot]) rather than the Jeeves token so that
+              # Jeeves (mr-jeeves[bot]) remains free to approve the resulting synchronize event.
+              # GitHub blocks a bot from approving commits it pushed itself.
               merge_state=$(gh pr view "$pr" --repo "${{ github.repository }}" \
                 --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo "ERROR")
-              if [ "$merge_state" = "BEHIND" ]; then
-                echo "PR #$pr is behind main, triggering Dependabot rebase"
-                GH_TOKEN="$DEPENDABOT_REBASE_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
-              elif [ "$merge_state" = "UNKNOWN" ]; then
-                echo "PR #$pr state UNKNOWN, triggering Dependabot rebase anyway to be safe"
-                GH_TOKEN="$DEPENDABOT_REBASE_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
+              if [ "$merge_state" = "BEHIND" ] || [ "$merge_state" = "UNKNOWN" ]; then
+                echo "PR #$pr merge state is '$merge_state', rebasing via github-actions[bot]"
+                GH_TOKEN="$UPDATE_BRANCH_TOKEN" gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
               else
                 echo "PR #$pr merge state is '$merge_state', no update needed"
               fi
-            else
+                        else
               gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
             fi
           done
