@@ -16,9 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'maansaake/locksmith'
     steps:
+      - name: Generate Jeeves app token
+        id: jeeves-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.JEEVES_APP_ID }}
+          private-key: ${{ secrets.JEEVES_APP_PRIVATE_KEY }}
       - name: Update out-of-date PR branches
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.jeeves-token.outputs.token }}
         run: |
           gh pr list --repo "${{ github.repository }}" --base main --state open --json number \
             --jq '.[].number' | \
