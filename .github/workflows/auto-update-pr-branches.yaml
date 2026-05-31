@@ -44,7 +44,7 @@ jobs:
               else
                 echo "PR #$pr merge state is '$merge_state', no update needed"
               fi
-                        else
+            else
               gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
             fi
           done
