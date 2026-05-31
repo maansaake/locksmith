@@ -16,35 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'maansaake/locksmith'
     steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.JEEVES_APP_ID }}
-          private-key: ${{ secrets.JEEVES_APP_PRIVATE_KEY }}
-
       - name: Update out-of-date PR branches
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          UPDATE_BRANCH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr list --repo "${{ github.repository }}" --base main --state open --json number,author \
-            --jq '.[] | "\(.number) \(.author.login)"' | \
-          while IFS=' ' read -r pr author; do
-            echo "Checking PR #$pr (author: $author)..."
-            if [ "$author" = "app/dependabot" ]; then
-              # Use github.token (github-actions[bot]) rather than the Jeeves token so that
-              # Jeeves (mr-jeeves[bot]) remains free to approve the resulting synchronize event.
-              # GitHub blocks a bot from approving commits it pushed itself.
-              merge_state=$(gh pr view "$pr" --repo "${{ github.repository }}" \
-                --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo "ERROR")
-              if [ "$merge_state" = "BEHIND" ] || [ "$merge_state" = "UNKNOWN" ]; then
-                echo "PR #$pr merge state is '$merge_state', rebasing via github-actions[bot]"
-                GH_TOKEN="$UPDATE_BRANCH_TOKEN" gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
-              else
-                echo "PR #$pr merge state is '$merge_state', no update needed"
-              fi
-            else
-              gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
-            fi
+          gh pr list --repo "${{ github.repository }}" --base main --state open --json number \
+            --jq '.[].number' | \
+          while read -r pr; do
+            echo "Updating PR #$pr..."
+            gh pr update-branch --rebase --repo "${{ github.repository }}" "$pr" || true
           done
