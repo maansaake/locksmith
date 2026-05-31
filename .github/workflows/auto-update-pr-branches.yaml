@@ -26,7 +26,7 @@ jobs:
       - name: Update out-of-date PR branches
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VANILLA_GH_TOKEN: ${{ github.token }}
+          DEPENDABOT_REBASE_TOKEN: ${{ secrets.DEPENDABOT_REBASE_TOKEN }}
         run: |
           gh pr list --repo "${{ github.repository }}" --base main --state open --json number,author \
             --jq '.[] | "\(.number) \(.author.login)"' | \
@@ -41,10 +41,10 @@ jobs:
                 --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo "ERROR")
               if [ "$merge_state" = "BEHIND" ]; then
                 echo "PR #$pr is behind main, triggering Dependabot rebase"
-                GH_TOKEN="$VANILLA_GH_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
+                GH_TOKEN="$DEPENDABOT_REBASE_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
               elif [ "$merge_state" = "UNKNOWN" ]; then
                 echo "PR #$pr state UNKNOWN, triggering Dependabot rebase anyway to be safe"
-                GH_TOKEN="$VANILLA_GH_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
+                GH_TOKEN="$DEPENDABOT_REBASE_TOKEN" gh pr comment --repo "${{ github.repository }}" "$pr" --body "@dependabot rebase" || true
               else
                 echo "PR #$pr merge state is '$merge_state', no update needed"
               fi
