@@ -22,6 +22,7 @@ jobs:
         with:
           app-id: ${{ secrets.JEEVES_APP_ID }}
           private-key: ${{ secrets.JEEVES_APP_PRIVATE_KEY }}
+
       - name: Update out-of-date PR branches
         env:
           GH_TOKEN: ${{ steps.jeeves-token.outputs.token }}
