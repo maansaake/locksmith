@@ -43,13 +43,7 @@ jobs:
           fi
 
       - name: Re-approve after branch update if auto-merge was already configured
-        # Runs on synchronize events where step 4 would be skipped — i.e. when fetch-metadata
-        # either failed (outcome=failure) or returned an empty/unexpected update-type.
-        # The auto-merge check inside the script guards against re-approving major updates.
-        if: >-
-          github.event.action == 'synchronize' &&
-          steps.metadata.outputs.update-type != 'version-update:semver-patch' &&
-          steps.metadata.outputs.update-type != 'version-update:semver-minor'
+        if: github.event.action == 'synchronize' && steps.metadata.outcome == 'failure'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
