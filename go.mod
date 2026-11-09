@@ -11,8 +11,8 @@ require (
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.73.1
 	github.com/spf13/cobra v1.10.2
-	github.com/trebent/envparser v1.0.8
-	github.com/trebent/zerologr v1.1.1
+	github.com/trebent/envparser v1.0.9
+	github.com/trebent/zerologr v1.1.2
 	go.opentelemetry.io/contrib/exporters/autoexport v0.72.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.72.0
 	go.opentelemetry.io/otel v1.47.0
