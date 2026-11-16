@@ -9,7 +9,7 @@ require (
 	github.com/maansaake/arbiter v0.1.2
 	github.com/peterh/liner v1.2.3
 	github.com/prometheus/client_model v0.6.3
-	github.com/prometheus/common v0.73.1
+	github.com/prometheus/common v0.74.0
 	github.com/spf13/cobra v1.10.2
 	github.com/trebent/envparser v1.0.9
 	github.com/trebent/zerologr v1.1.2
@@ -55,7 +55,7 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pandatix/go-abnf v0.5.3 // indirect
+	github.com/pandatix/go-abnf v0.5.5 // indirect
 	github.com/prometheus/client_golang v1.25.0 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.23.0 // indirect
